@@ -1647,7 +1647,7 @@
               <span>▶</span>
             </button>
             <div class="cal-week-display" id="calWeekDisplayTitle">
-              Đang tính toán tuần...
+              <span>Lịch học tuần này</span>
             </div>
           </div>
 
@@ -2177,9 +2177,7 @@
           appState.profile = data.profile;
           localStorage.setItem('hcmute_cached_profile', JSON.stringify(data.profile));
           showDashboard();
-          await loadOverviewData();
-          // Load considerations in background so timetable renders immediately
-          loadConsiderations();
+          loadOverviewData().catch(err => console.warn('Overview load error:', err));
         } else if (res.status === 401 || (data && data.authenticated === false && data.reason === 'expired')) {
           localStorage.removeItem('hcmute_session_token');
           localStorage.removeItem('hcmute_cached_profile');
@@ -2206,6 +2204,12 @@
       document.getElementById('mainNav')?.classList.remove('hidden');
       document.getElementById('userPill')?.classList.remove('hidden');
       document.getElementById('logoutBtn')?.classList.remove('hidden');
+
+      // Instant 0ms Week & Matrix Paint
+      if (!appState.currentWeekMonday) {
+        appState.currentWeekMonday = getMonday(new Date());
+      }
+      renderScheduleCalendar();
 
       if (appState.profile) {
         const userDisplay = document.getElementById('userNameDisplay');
@@ -2297,9 +2301,8 @@
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
-          // Instant navigation: load overview & considerations in background
+          // Instant navigation: load overview in background without blocking
           loadOverviewData().catch(err => console.warn('Overview load error:', err));
-          loadConsiderations();
           return;
         } else {
           errorDiv.textContent = data.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại MSSV và Mật khẩu.';
@@ -2363,9 +2366,8 @@
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
-          // Instant navigation: load overview & considerations in background
+          // Instant navigation: load overview in background without blocking
           loadOverviewData().catch(err => console.warn('Overview load error:', err));
-          loadConsiderations();
           return;
         } else {
           errorDiv.textContent = data.message || 'Token không hợp lệ hoặc đã hết hạn.';
@@ -2731,6 +2733,20 @@
         { id: 'evening', name: 'Buổi Tối', period: 'Tiết 13 – 16', time: '18:00 – 21:00', icon: '🌙' },
       ];
 
+      // Ultra-fast O(1) Pre-indexing of classes by (YYYY-MM-DD + session)
+      const classMap = {};
+      (appState.classes || []).forEach(c => {
+        if (!c.start) return;
+        const dtStr = c.start.slice(0, 10);
+        const h = parseInt(c.start.slice(11, 13) || '0', 10) + (parseInt(c.start.slice(14, 16) || '0', 10) / 60);
+        let sId = 'morning';
+        if (h >= 17.5) sId = 'evening';
+        else if (h >= 12.0) sId = 'afternoon';
+        const key = `${dtStr}_${sId}`;
+        if (!classMap[key]) classMap[key] = [];
+        classMap[key].push(c);
+      });
+
       // Build Table HTML
       let html = `<table class="matrix-table">`;
       
@@ -2769,18 +2785,7 @@
         dayDates.forEach(d => {
           const isToday = d.getTime() === now.getTime();
           const dayYMD = formatDateYMD(d);
-
-          // Find classes in this day & session using YYYY-MM-DD
-          const matchingClasses = (appState.classes || []).filter(c => {
-            if (!c.start) return false;
-            const cStart = new Date(c.start);
-            if (formatDateYMD(cStart) !== dayYMD) return false;
-            const hour = cStart.getHours() + (cStart.getMinutes() / 60);
-            if (sess.id === 'morning') return hour < 12.0;
-            if (sess.id === 'afternoon') return hour >= 12.0 && hour < 17.5;
-            if (sess.id === 'evening') return hour >= 17.5;
-            return false;
-          });
+          const matchingClasses = classMap[`${dayYMD}_${sess.id}`] || [];
 
           html += `<td class="matrix-td ${isToday ? 'today-col' : ''}">`;
           if (matchingClasses.length === 0) {

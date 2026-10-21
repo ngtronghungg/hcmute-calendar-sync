@@ -688,25 +688,30 @@ def api_overview():
                     fut_yt = None
                 else:
                     fut_yt = pool.submit(client.get_year_and_term)
+
+                curr_year = req_year or curr_year
+                curr_term = req_term or curr_term
+
+                # Submit all queries concurrently in parallel (Zero Sequential Stalling)
+                fut_sched = pool.submit(client.get_schedule_semester, curr_year, curr_term)
+                fut_time_exams = pool.submit(client.get_exams_by_time)
+                fut_term_exams = pool.submit(client.get_exam_schedule, curr_year, curr_term)
+
+                all_futs = [f for f in [fut_yt, fut_sched, fut_time_exams, fut_term_exams] if f is not None]
+                # Fast bounded parallel timeout: never hang or freeze the browser
+                done, _ = wait(all_futs, timeout=3.2)
+
+                if fut_yt and fut_yt in done:
                     try:
-                        yt = fut_yt.result(timeout=2.5)
+                        yt = fut_yt.result()
                         available_years = yt.get("YearStudy") or available_years
                         available_terms = yt.get("Terms") or available_terms
-                        curr_year = req_year or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
-                        curr_term = req_term or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
                         STUDENT_TERMS_CACHE[mssv] = {
                             "data": yt,
                             "timestamp": datetime.now(timezone.utc)
                         }
                     except Exception:
                         pass
-
-                fut_sched = pool.submit(client.get_schedule_semester, curr_year, curr_term)
-                fut_time_exams = pool.submit(client.get_exams_by_time)
-                fut_term_exams = pool.submit(client.get_exam_schedule, curr_year, curr_term)
-
-                # Bounded fast timeout: never hang the browser or kick the user out
-                done, _ = wait([fut_sched, fut_time_exams, fut_term_exams], timeout=4.5)
 
                 if fut_sched in done:
                     try:
