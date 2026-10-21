@@ -1,0 +1,126 @@
+{
+  "hcmute": {
+    "base_url": "https://portalapi.hcmute.edu.vn/api/",
+    "api_key": "utepscRBF0zT2Mqo6vMw69YMOH43IrB2RtXBS0EHit2kzvL2auxaFJBvw==",
+    "client_id": "ute",
+    "nam_hoc": "",
+    "hoc_ky": ""
+  },
+  "google_calendar": {
+    "schedule_calendar_name": "HCMUTE - Thời Khóa Biểu",
+    "reminder_calendar_name": "HCMUTE - Nhắc Nhở & Hạn Chót",
+    "credentials_path": "config/credentials.json",
+    "token_path": "data/google_token.json",
+    "class_reminder_minutes": [
+      20
+    ],
+    "deadline_reminder_minutes": [
+      4320,
+      1440,
+      120
+    ]
+  },
+  "consideration": {
+    "lookback_days": 60,
+    "auto_add_reminders": false,
+    "rules": {
+      "tuition": {
+        "title": "Học phí & Công nợ",
+        "keywords": [
+          "học phí",
+          "hoc phi",
+          "đóng tiền",
+          "gia hạn học phí",
+          "công nợ"
+        ],
+        "priority": "HIGH",
+        "color_id": "11"
+      },
+      "civic_education": {
+        "title": "Sinh hoạt công dân",
+        "keywords": [
+          "sinh hoạt công dân",
+          "shcd",
+          "đầu khóa",
+          "giữa khóa",
+          "cuối khóa",
+          "làm bài thu hoạch"
+        ],
+        "priority": "HIGH",
+        "color_id": "5"
+      },
+      "certificate": {
+        "title": "Nộp chứng chỉ ngoại ngữ / tin học",
+        "keywords": [
+          "chứng chỉ",
+          "tiếng anh",
+          "tin học",
+          "chuẩn đầu ra",
+          "toeic",
+          "ielts",
+          "ic3",
+          "mos"
+        ],
+        "priority": "HIGH",
+        "color_id": "6"
+      },
+      "survey_evaluation": {
+        "title": "Khảo sát & Đánh giá môn học",
+        "keywords": [
+          "khảo sát",
+          "khao sat",
+          "đánh giá giảng viên",
+          "đánh giá môn học",
+          "lấy ý kiến"
+        ],
+        "priority": "MEDIUM",
+        "color_id": "9"
+      },
+      "course_registration": {
+        "title": "Đăng ký môn học & Rút học phần",
+        "keywords": [
+          "đăng ký môn học",
+          "dkmh",
+          "rút môn học",
+          "hủy học phần",
+          "đăng ký học lại",
+          "đăng ký cải thiện"
+        ],
+        "priority": "HIGH",
+        "color_id": "10"
+      },
+      "exam": {
+        "title": "Lịch thi & Hoãn thi",
+        "keywords": [
+          "lịch thi",
+          "hoãn thi",
+          "phúc khảo",
+          "điểm thi",
+          "thi kết thúc học phần"
+        ],
+        "priority": "HIGH",
+        "color_id": "4"
+      },
+      "scholarship": {
+        "title": "Học bổng & Hỗ trợ sinh viên",
+        "keywords": [
+          "học bổng",
+          "miễn giảm học phí",
+          "trợ cấp xã hội",
+          "vay vốn"
+        ],
+        "priority": "MEDIUM",
+        "color_id": "2"
+      }
+    }
+  },
+  "telegram": {
+    "enabled": false,
+    "bot_token": "",
+    "chat_id": "",
+    "morning_briefing": true,
+    "morning_time": "06:30",
+    "exam_alert": true,
+    "diff_alert": true
+  }
+}
