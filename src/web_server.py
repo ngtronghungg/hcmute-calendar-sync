@@ -62,6 +62,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 ACTIVE_SESSIONS: Dict[str, dict] = {}
+STUDENT_TERMS_CACHE: Dict[str, dict] = {}
 SESSION_LOCK = threading.RLock()
 
 
@@ -82,20 +83,32 @@ def load_sessions() -> None:
 
 
 def save_sessions() -> None:
-    """Persist active student sessions to disk atomically and thread-safely."""
+    """Persist active student sessions to disk atomically and thread-safely with Windows retry."""
     with SESSION_LOCK:
-        try:
-            os.makedirs(os.path.dirname(SESSIONS_FILE), exist_ok=True)
-            tmp_file = f"{SESSIONS_FILE}.tmp.{os.getpid()}.{secrets.token_hex(4)}"
-            with open(tmp_file, "w", encoding="utf-8") as f:
-                json.dump(ACTIVE_SESSIONS, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_file, SESSIONS_FILE)
-        except Exception:
+        for attempt in range(3):
             try:
-                if 'tmp_file' in locals() and os.path.exists(tmp_file):
-                    os.remove(tmp_file)
+                os.makedirs(os.path.dirname(SESSIONS_FILE), exist_ok=True)
+                tmp_file = f"{SESSIONS_FILE}.tmp.{os.getpid()}.{secrets.token_hex(4)}"
+                with open(tmp_file, "w", encoding="utf-8") as f:
+                    json.dump(ACTIVE_SESSIONS, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_file, SESSIONS_FILE)
+                break
             except Exception:
-                pass
+                if 'tmp_file' in locals() and os.path.exists(tmp_file):
+                    try:
+                        os.remove(tmp_file)
+                    except Exception:
+                        pass
+                if attempt == 2:
+                    # Final fallback: direct atomic write
+                    try:
+                        with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
+                            json.dump(ACTIVE_SESSIONS, f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                else:
+                    import time
+                    time.sleep(0.02)
 
 
 load_sessions()
@@ -314,9 +327,11 @@ def api_status():
     Enforces per-browser session isolation via X-Session-Token.
     Unauthenticated requests always receive authenticated: false.
     """
+    token = request.headers.get("X-Session-Token", "").strip() or request.cookies.get("hcmute_session", "").strip() or request.args.get("session_token", "").strip()
     session = get_request_session()
     if not session or not session.get("portal_token"):
-        return jsonify({"authenticated": False})
+        reason = "expired" if token else "no_session"
+        return jsonify({"authenticated": False, "reason": reason})
 
     s_id = str(session.get("mssv", "")).strip()
     s_name = session.get("name", "Sinh viên")
@@ -332,65 +347,6 @@ def api_status():
             "status": session.get("status", "Đang học"),
         }
     })
-
-
-@app.route("/api/ai/chat", methods=["POST"])
-def api_ai_chat():
-    """
-    Direct web chat endpoint for UTE_Cal assistant powered by Groq API.
-    Zero-knowledge session isolation, instant response (< 1s).
-    """
-    data = request.json or {}
-    user_msg = str(data.get("message") or "").strip()
-    if not user_msg:
-        return jsonify({"success": False, "message": "Tin nhắn không được để trống."}), 400
-
-    from src.conversational_ai import generate_conversational_reply
-    from src.telegram_bot import load_cancellations, load_cancellation_votes
-
-    session = get_request_session()
-    client = get_session_client(session) if session else None
-    student_name = session.get("name", "Bạn") if session else "Bạn"
-    student_mssv = str(session.get("mssv", "")).strip() if session else ""
-
-    all_events = []
-    if student_mssv:
-        try:
-            all_events = load_feed_cache(mssv=student_mssv) or []
-            cached_exams = load_cached_exams(mssv=student_mssv)
-            if not cached_exams:
-                cached_exams = load_cached_exams(mssv=None)
-            existing_uids = {e.uid for e in all_events}
-            for ex in (cached_exams or []):
-                if ex.uid not in existing_uids:
-                    all_events.append(ex)
-        except Exception:
-            all_events = []
-
-    cancelled_set = load_cancellations()
-    votes_db = load_cancellation_votes()
-
-    cfg = load_config()
-    groq_key = cfg.get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
-
-    try:
-        reply_text, _ = generate_conversational_reply(
-            text=user_msg,
-            chat_id=student_mssv or "web_user",
-            client=client,
-            student_name=student_name,
-            student_mssv=student_mssv,
-            all_events=all_events,
-            cancelled_set=cancelled_set,
-            votes_db=votes_db,
-            groq_key=groq_key,
-        )
-        return jsonify({"success": True, "reply": reply_text})
-    except Exception as e:
-        return jsonify({
-            "success": True,
-            "reply": f"🤖 <b>UTE_Cal:</b> Xin lỗi bạn, mình vừa gặp trục trặc tạm thời ({str(e)}). Vui lòng kiểm tra Groq API Key hoặc thử lại nhé!"
-        })
 
 
 @app.route("/api/login", methods=["POST"])
@@ -718,15 +674,32 @@ def api_overview():
         try:
             from concurrent.futures import ThreadPoolExecutor, wait
             with ThreadPoolExecutor(max_workers=4) as pool:
-                fut_yt = pool.submit(client.get_year_and_term)
-                try:
-                    yt = fut_yt.result(timeout=3.0)
+                req_year = request.args.get("year", "").strip()
+                req_term = request.args.get("term", "").strip()
+                cached_yt = STUDENT_TERMS_CACHE.get(mssv)
+                
+                # Check 1-hour fast memory cache for academic years & terms
+                if cached_yt and (datetime.now(timezone.utc) - cached_yt["timestamp"]).total_seconds() < 3600:
+                    yt = cached_yt["data"]
                     available_years = yt.get("YearStudy") or available_years
                     available_terms = yt.get("Terms") or available_terms
-                    curr_year = request.args.get("year") or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
-                    curr_term = request.args.get("term") or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
-                except Exception:
-                    pass
+                    curr_year = req_year or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
+                    curr_term = req_term or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
+                    fut_yt = None
+                else:
+                    fut_yt = pool.submit(client.get_year_and_term)
+                    try:
+                        yt = fut_yt.result(timeout=2.5)
+                        available_years = yt.get("YearStudy") or available_years
+                        available_terms = yt.get("Terms") or available_terms
+                        curr_year = req_year or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
+                        curr_term = req_term or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
+                        STUDENT_TERMS_CACHE[mssv] = {
+                            "data": yt,
+                            "timestamp": datetime.now(timezone.utc)
+                        }
+                    except Exception:
+                        pass
 
                 fut_sched = pool.submit(client.get_schedule_semester, curr_year, curr_term)
                 fut_time_exams = pool.submit(client.get_exams_by_time)

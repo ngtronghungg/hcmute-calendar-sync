@@ -2132,6 +2132,23 @@
 
     // Initialize application on load
     window.addEventListener('DOMContentLoaded', async () => {
+      // Optimistic instant paint if student is already logged in
+      const token = localStorage.getItem('hcmute_session_token');
+      const cachedProfile = localStorage.getItem('hcmute_cached_profile');
+      if (token && cachedProfile) {
+        try {
+          appState.profile = JSON.parse(cachedProfile);
+          appState.authenticated = true;
+          showDashboard();
+          const cachedOverview = localStorage.getItem('hcmute_cached_overview');
+          if (cachedOverview) {
+            try {
+              const ov = JSON.parse(cachedOverview);
+              applyOverviewData(ov, true);
+            } catch {}
+          }
+        } catch {}
+      }
       await checkAuthStatus();
     });
 
@@ -2149,22 +2166,29 @@
         try {
           data = await res.json();
         } catch(e) {
+          // If server is restarting, do not kick user out if we have valid local session
+          if (appState.authenticated) return;
           showLogin();
           return;
         }
+
         if (data.authenticated && data.profile) {
           appState.authenticated = true;
           appState.profile = data.profile;
+          localStorage.setItem('hcmute_cached_profile', JSON.stringify(data.profile));
           showDashboard();
           await loadOverviewData();
           // Load considerations in background so timetable renders immediately
           loadConsiderations();
-        } else {
+        } else if (res.status === 401 || (data && data.authenticated === false && data.reason === 'expired')) {
           localStorage.removeItem('hcmute_session_token');
+          localStorage.removeItem('hcmute_cached_profile');
+          localStorage.removeItem('hcmute_cached_overview');
           showLogin();
         }
       } catch (err) {
-        showLogin();
+        // Offline or network hiccup - retain current session without kickout loop
+        console.warn('Network issue during status check, retaining local session:', err);
       }
     }
 
@@ -2219,6 +2243,8 @@
         await apiFetch('/api/logout', { method: 'POST' });
       } catch {}
       localStorage.removeItem('hcmute_session_token');
+      localStorage.removeItem('hcmute_cached_profile');
+      localStorage.removeItem('hcmute_cached_overview');
       localStorage.clear();
       sessionStorage.clear();
       document.cookie = "hcmute_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
@@ -2263,6 +2289,9 @@
 
         if (data.success && data.session_token) {
           localStorage.setItem('hcmute_session_token', data.session_token);
+          if (data.profile) {
+            localStorage.setItem('hcmute_cached_profile', JSON.stringify(data.profile));
+          }
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
@@ -2325,6 +2354,9 @@
         }
         if (data.success && data.session_token) {
           localStorage.setItem('hcmute_session_token', data.session_token);
+          if (data.profile) {
+            localStorage.setItem('hcmute_cached_profile', JSON.stringify(data.profile));
+          }
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
@@ -2408,10 +2440,92 @@
       loadOverviewData();
     }
 
+    function applyOverviewData(data, isCached = false) {
+      if (!data) return;
+      appState.classes = data.classes || [];
+      appState.exams = data.exams || [];
+      appState.overviewData = data;
+
+      // Populate year & term dropdowns if first load
+      populateSemesterSelectors(data.years, data.terms, data.year, data.term);
+
+      const upCount = data.upcoming_classes_count ?? appState.classes.length;
+      const totalCount = data.total_classes_count ?? appState.classes.length;
+
+      const subTitleEl = document.getElementById('semesterSubtitle');
+      const toggleLabelEl = document.getElementById('scheduleToggleLabel');
+      if (subTitleEl && toggleLabelEl) {
+        if (appState.includePastSchedule) {
+          subTitleEl.textContent =
+            `Học kỳ ${data.term} • Năm học ${data.year} (Tổng cộng ${totalCount} buổi học cả kỳ)`;
+          toggleLabelEl.textContent = `Hiện tất cả (${totalCount})`;
+        } else {
+          subTitleEl.textContent =
+            `Học kỳ ${data.term} • Năm học ${data.year} • ${upCount} buổi học sắp tới (từ hôm nay đến hết học kỳ)`;
+          toggleLabelEl.textContent = `Chỉ hiện lịch sắp tới (${upCount})`;
+        }
+      }
+
+      const upExams = data.upcoming_exams_count ?? appState.exams.length;
+      const totalExams = data.total_exams_count ?? appState.exams.length;
+      const examsSub = document.getElementById('examsSubtitle');
+      if (examsSub) {
+        examsSub.textContent = appState.includePastExams
+          ? `Tổng cộng ${totalExams} môn thi (cả môn đã thi và sắp thi)`
+          : `${upExams} môn thi trong đợt này`;
+      }
+      if (document.getElementById('examsToggleLabel')) {
+        document.getElementById('examsToggleLabel').textContent =
+          appState.includePastExams ? `Hiện tất cả (${totalExams})` : `Chỉ hiện môn sắp thi (${upExams})`;
+      }
+
+      // Smart Auto-Focus Week:
+      // Jump to the closest week with classes so timetable never opens to an empty screen
+      if (!appState.currentWeekMonday && appState.classes && appState.classes.length > 0) {
+        const now = new Date();
+        const thisMonday = getMonday(now);
+        const thisSunday = new Date(thisMonday);
+        thisSunday.setDate(thisMonday.getDate() + 6);
+        thisSunday.setHours(23, 59, 59, 999);
+
+        const hasClassesThisWeek = appState.classes.some(c => {
+          if (!c.start) return false;
+          const dt = new Date(c.start);
+          return dt >= thisMonday && dt <= thisSunday;
+        });
+
+        if (hasClassesThisWeek) {
+          appState.currentWeekMonday = thisMonday;
+        } else {
+          // Find first upcoming class >= today
+          const upcomingClass = appState.classes.find(c => c.start && new Date(c.start) >= now);
+          if (upcomingClass) {
+            appState.currentWeekMonday = getMonday(new Date(upcomingClass.start));
+          } else {
+            appState.currentWeekMonday = thisMonday;
+          }
+        }
+      }
+
+      renderScheduleCalendar();
+      renderExamsGrid(appState.exams);
+    }
+
     async function loadOverviewData(force = false) {
       const grid = document.getElementById('scheduleGrid');
       const examsGrid = document.getElementById('examsGrid');
-      grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Đang tải thời khóa biểu từ HCMUTE...</div>`;
+
+      // If we don't have classes loaded yet, attempt to restore from cache first (0ms)
+      if (!appState.classes || appState.classes.length === 0) {
+        const cachedOverview = localStorage.getItem('hcmute_cached_overview');
+        if (cachedOverview) {
+          try {
+            applyOverviewData(JSON.parse(cachedOverview), true);
+          } catch {}
+        } else {
+          grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Đang tải thời khóa biểu từ HCMUTE...</div>`;
+        }
+      }
 
       try {
         const yearVal = document.getElementById('yearSelect')?.value || '';
@@ -2425,76 +2539,24 @@
         try {
           data = await res.json();
         } catch(e) {
-          grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Máy chủ đang phản hồi chậm hoặc đang khởi động. Vui lòng thử lại sau giây lát.</div>`;
+          if (!appState.classes || appState.classes.length === 0) {
+            grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Máy chủ đang phản hồi chậm hoặc đang khởi động. Vui lòng thử lại sau giây lát.</div>`;
+          }
           return;
         }
         if (!data || !data.success) {
           throw new Error(data?.message || 'Không thể đồng bộ dữ liệu lúc này.');
         }
 
-        appState.classes = data.classes || [];
-        appState.exams = data.exams || [];
-        appState.overviewData = data;
-
-        // Populate year & term dropdowns if first load
-        populateSemesterSelectors(data.years, data.terms, data.year, data.term);
-
-        const upCount = data.upcoming_classes_count ?? appState.classes.length;
-        const totalCount = data.total_classes_count ?? appState.classes.length;
-
-        if (appState.includePastSchedule) {
-          document.getElementById('semesterSubtitle').textContent =
-            `Học kỳ ${data.term} • Năm học ${data.year} (Tổng cộng ${totalCount} buổi học cả kỳ)`;
-          document.getElementById('scheduleToggleLabel').textContent = `Hiện tất cả (${totalCount})`;
-        } else {
-          document.getElementById('semesterSubtitle').textContent =
-            `Học kỳ ${data.term} • Năm học ${data.year} • ${upCount} buổi học sắp tới (từ hôm nay đến hết học kỳ)`;
-          document.getElementById('scheduleToggleLabel').textContent = `Chỉ hiện lịch sắp tới (${upCount})`;
+        applyOverviewData(data);
+        try {
+          localStorage.setItem('hcmute_cached_overview', JSON.stringify(data));
+        } catch {}
+      } catch (err) {
+        if (!appState.classes || appState.classes.length === 0) {
+          grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Không thể tải TKB: ${err.message}</div>`;
         }
-
-        const upExams = data.upcoming_exams_count ?? appState.exams.length;
-        const totalExams = data.total_exams_count ?? appState.exams.length;
-        const examsSub = document.getElementById('examsSubtitle');
-        if (examsSub) {
-          examsSub.textContent = appState.includePastExams
-            ? `Tổng cộng ${totalExams} môn thi (cả môn đã thi và sắp thi)`
-            : `${upExams} môn thi trong đợt này`;
-        }
-        if (document.getElementById('examsToggleLabel')) {
-          document.getElementById('examsToggleLabel').textContent =
-            appState.includePastExams ? `Hiện tất cả (${totalExams})` : `Chỉ hiện môn sắp thi (${upExams})`;
-        }
-
-        // Smart Auto-Focus Week:
-        // Jump to the closest week with classes so timetable never opens to an empty screen
-        if (!appState.currentWeekMonday && appState.classes && appState.classes.length > 0) {
-          const now = new Date();
-          const thisMonday = getMonday(now);
-          const thisSunday = new Date(thisMonday);
-          thisSunday.setDate(thisMonday.getDate() + 6);
-          thisSunday.setHours(23, 59, 59, 999);
-
-          const hasClassesThisWeek = appState.classes.some(c => {
-            if (!c.start) return false;
-            const dt = new Date(c.start);
-            return dt >= thisMonday && dt <= thisSunday;
-          });
-
-          if (hasClassesThisWeek) {
-            appState.currentWeekMonday = thisMonday;
-          } else {
-            // Find first upcoming class >= today
-            const upcomingClass = appState.classes.find(c => c.start && new Date(c.start) >= now);
-            if (upcomingClass) {
-              appState.currentWeekMonday = getMonday(new Date(upcomingClass.start));
-            } else {
-              appState.currentWeekMonday = thisMonday;
-            }
-          }
-        }
-
-        renderScheduleCalendar();
-        renderExamsGrid(appState.exams);
+      }
       } catch (err) {
         grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Không thể tải TKB: ${err.message}</div>`;
       }

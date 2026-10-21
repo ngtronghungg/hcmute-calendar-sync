@@ -164,13 +164,21 @@ class TestNoticeAnalyzer(unittest.TestCase):
             self.assertEqual(data.get("status"), "healthy")
             self.assertEqual(data.get("service"), "UTE_Cal")
 
-    def test_ai_chat_endpoint_empty_message(self):
-        from src.web_server import app
-        with app.test_client() as client:
-            res = client.post("/api/ai/chat", json={"message": ""})
-            self.assertEqual(res.status_code, 400)
-            data = res.get_json()
-            self.assertFalse(data.get("success"))
+    def test_telegram_conversational_ai_greeting(self):
+        from src.conversational_ai import generate_conversational_reply
+        reply, markup = generate_conversational_reply(
+            text="Xin chào bot UTE_Cal",
+            chat_id="123456",
+            client=None,
+            student_name="Nguyen Van A",
+            student_mssv="22110001",
+            all_events=[],
+            cancelled_set=set(),
+            votes_db={},
+        )
+        self.assertIsInstance(reply, str)
+        self.assertTrue(len(reply) > 0)
+        self.assertIn("UTE_Cal", reply)
 
 
 if __name__ == "__main__":

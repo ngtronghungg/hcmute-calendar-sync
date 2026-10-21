@@ -697,7 +697,7 @@ def generate_conversational_reply(
         return intro, None
 
     # 9. Greetings / Chào hỏi
-    if any(norm == w or norm.startswith(w + " ") for w in ["chao", "hi", "hello", "alo", "helo", "hi bot", "chao bot", "chao ban", "chao em"]):
+    if any(norm == w or norm.startswith(w + " ") for w in ["chao", "hi", "hello", "alo", "helo", "hi bot", "chao bot", "chao ban", "chao em", "xin chao", "xin chao bot"]):
         greeting = (
             f"👋 <b>Chào {student_name}! Mình là UTE_Cal, rất vui được hỗ trợ bạn!</b> 😊\n\n"
             f"Mình là Trợ lý Thời khóa biểu & Lịch thi HCMUTE. Bạn muốn xem lịch học hôm nay, ngày mai, tuần sau, tra cứu phòng học hay kiểm tra lịch thi cứ hỏi tự nhiên nha!"

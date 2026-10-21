@@ -19,9 +19,26 @@ from src.schedule_cache import save_feed_cache, load_feed_cache, save_cached_exa
 
 
 class TestMultiUserSessions(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import src.web_server as ws
+        cls._orig_sessions_file = ws.SESSIONS_FILE
+        cls._test_sessions_file = os.path.join(PROJECT_ROOT, "data", ".test_sessions.json")
+        ws.SESSIONS_FILE = cls._test_sessions_file
+
+    @classmethod
+    def tearDownClass(cls):
+        import src.web_server as ws
+        ws.SESSIONS_FILE = cls._orig_sessions_file
+        if os.path.exists(cls._test_sessions_file):
+            try:
+                os.remove(cls._test_sessions_file)
+            except Exception:
+                pass
+
     def setUp(self):
         self.client = app.test_client()
-        # Clean session store
+        # Clean session store in isolated test file
         ACTIVE_SESSIONS.clear()
         save_sessions()
 

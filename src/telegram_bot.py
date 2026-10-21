@@ -325,7 +325,26 @@ def broadcast_telegram_message(bot_token: str, message: str) -> dict:
     return {"total": len(users), "sent": sent_count, "errors": error_count}
 
 
-def load_config() -> dict:
+_CONFIG_CACHE: Optional[dict] = None
+_CONFIG_CACHE_MTIME: float = 0.0
+_SECRETS_CACHE_MTIME: float = 0.0
+_CONFIG_CACHE_LOCK = threading.Lock()
+
+
+def load_config(force_reload: bool = False) -> dict:
+    global _CONFIG_CACHE, _CONFIG_CACHE_MTIME, _SECRETS_CACHE_MTIME
+    secrets_path = os.path.join(PROJECT_ROOT, "data", ".secrets.json")
+
+    try:
+        cfg_mtime = os.path.getmtime(CONFIG_PATH) if os.path.exists(CONFIG_PATH) else 0.0
+        sec_mtime = os.path.getmtime(secrets_path) if os.path.exists(secrets_path) else 0.0
+    except OSError:
+        cfg_mtime, sec_mtime = 0.0, 0.0
+
+    with _CONFIG_CACHE_LOCK:
+        if not force_reload and _CONFIG_CACHE is not None and cfg_mtime == _CONFIG_CACHE_MTIME and sec_mtime == _SECRETS_CACHE_MTIME:
+            return json.loads(json.dumps(_CONFIG_CACHE))
+
     cfg = {}
     if os.path.exists(CONFIG_PATH):
         try:
@@ -338,7 +357,6 @@ def load_config() -> dict:
         cfg["telegram"] = {}
 
     # 1. Local Private Secrets File (data/.secrets.json - Gitignored)
-    secrets_path = os.path.join(PROJECT_ROOT, "data", ".secrets.json")
     if os.path.exists(secrets_path):
         try:
             with open(secrets_path, "r", encoding="utf-8") as sf:
@@ -379,7 +397,12 @@ def load_config() -> dict:
     if env_gemini:
         cfg["gemini_api_key"] = env_gemini.strip()
 
-    return cfg
+    with _CONFIG_CACHE_LOCK:
+        _CONFIG_CACHE = cfg
+        _CONFIG_CACHE_MTIME = cfg_mtime
+        _SECRETS_CACHE_MTIME = sec_mtime
+
+    return json.loads(json.dumps(cfg))
 
 
 def save_config(cfg: dict) -> bool:
@@ -417,6 +440,11 @@ def save_config(cfg: dict) -> bool:
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(clean_cfg, f, ensure_ascii=False, indent=2)
+
+        # Invalidate in-memory cache so changes take effect immediately
+        global _CONFIG_CACHE
+        with _CONFIG_CACHE_LOCK:
+            _CONFIG_CACHE = None
         return True
     except Exception:
         return False
@@ -1615,10 +1643,20 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
         # Natural Vietnamese Conversational AI & Dynamic Intent Handler
         try:
             from src.conversational_ai import generate_conversational_reply
-            all_events = load_feed_cache()
+            from src.schedule_cache import load_cached_exams
+            s_name, s_mssv = get_student_identity(chat_id, client)
+            all_events = load_feed_cache(mssv=s_mssv) or []
+            cached_exams = load_cached_exams(mssv=s_mssv)
+            if not cached_exams and s_mssv:
+                cached_exams = load_cached_exams(mssv=None)
+            if cached_exams:
+                existing_uids = {e.uid for e in all_events}
+                for ex in cached_exams:
+                    if ex.uid not in existing_uids:
+                        all_events.append(ex)
+
             cancelled_set = load_cancellations()
             votes_db = load_cancellation_votes()
-            s_name, s_mssv = get_student_identity(chat_id, client)
             cfg = load_config()
             groq_key = cfg.get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
             gemini_key = cfg.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY", "")
