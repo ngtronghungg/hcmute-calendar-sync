@@ -850,6 +850,72 @@
       border-radius: var(--radius-sm);
     }
 
+    .filter-chip {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--surface-border);
+      color: var(--text-subtle);
+      border-radius: var(--radius-full);
+      padding: 6px 14px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .filter-chip:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border-color: var(--surface-border-strong);
+    }
+    .filter-chip.active {
+      background: rgba(14, 165, 233, 0.18);
+      color: #38bdf8;
+      border-color: rgba(56, 189, 248, 0.4);
+      font-weight: 600;
+    }
+    .filter-chip span {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+    .filter-chip.active span {
+      background: rgba(56, 189, 248, 0.25);
+      color: #fff;
+    }
+    .notice-type-pill {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .notice-type-pill.personal {
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+    .notice-type-pill.general {
+      background: rgba(14, 165, 233, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(14, 165, 233, 0.3);
+    }
+    .notice-type-pill.exam {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .notice-type-pill.tuition {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
     .reminder-title {
       font-size: 15px;
       font-weight: 600;
@@ -1409,130 +1475,6 @@
       gap: 6px;
     }
 
-    /* ==========================================================================
-       AI CHAT WIDGET (UTE_Cal)
-       ========================================================================== */
-    .fab-chat {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      z-index: 990;
-      display: inline-flex;
-      align-items: center;
-      gap: 9px;
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: var(--radius-full);
-      padding: 12px 20px;
-      font-size: 13.5px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 8px 28px rgba(2, 132, 199, 0.45);
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .fab-chat:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 34px rgba(2, 132, 199, 0.6);
-    }
-    .ai-chat-drawer {
-      position: fixed;
-      bottom: 86px;
-      right: 24px;
-      width: min(390px, calc(100vw - 32px));
-      height: min(560px, calc(100vh - 120px));
-      background: rgba(18, 18, 24, 0.95);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      border: 1px solid var(--surface-border-strong);
-      border-radius: 22px;
-      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.7);
-      z-index: 991;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      animation: drawerSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    @keyframes drawerSlideUp {
-      from { opacity: 0; transform: translateY(16px) scale(0.96); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .chat-drawer-header {
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--surface-border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(255, 255, 255, 0.02);
-    }
-    .chat-drawer-title {
-      font-size: 14.5px;
-      font-weight: 700;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .chat-drawer-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .chat-bubble {
-      max-width: 86%;
-      padding: 10px 14px;
-      border-radius: 16px;
-      font-size: 13px;
-      line-height: 1.5;
-      word-break: break-word;
-    }
-    .chat-bubble.bot {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--surface-border);
-      color: var(--text-main);
-      align-self: flex-start;
-      border-bottom-left-radius: 4px;
-    }
-    .chat-bubble.user {
-      background: #0284c7;
-      color: #fff;
-      align-self: flex-end;
-      border-bottom-right-radius: 4px;
-    }
-    .chat-quick-prompts {
-      padding: 8px 14px 4px;
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      white-space: nowrap;
-      scrollbar-width: none;
-    }
-    .chat-quick-prompts::-webkit-scrollbar { display: none; }
-    .chat-prompt-pill {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--surface-border);
-      border-radius: var(--radius-full);
-      padding: 4px 10px;
-      font-size: 11.5px;
-      color: var(--text-subtle);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .chat-prompt-pill:hover {
-      background: rgba(14, 165, 233, 0.15);
-      color: var(--accent-blue);
-      border-color: rgba(14, 165, 233, 0.35);
-    }
-    .chat-drawer-input-row {
-      padding: 12px 14px;
-      border-top: 1px solid var(--surface-border);
-      display: flex;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.02);
-    }
   </style>
 </head>
 <body>
@@ -1555,7 +1497,7 @@
       </button>
       <button class="tab-btn" onclick="switchTab('reminders')">
         <span class="tab-icon">📢</span>
-        <span class="tab-text">Nhắc nhở</span>
+        <span class="tab-text"><span class="tab-text-full">Nhắc nhở & Hộp thư</span><span class="tab-text-short">Hộp thư</span></span>
         <span class="counter-badge" id="reminderCountBadge">0</span>
       </button>
       <button class="tab-btn" onclick="switchTab('exams')">
@@ -1770,17 +1712,47 @@
 
       </section>
 
-      <!-- TAB 2: REMINDERS & CONSIDERATION (NHẮC NHỞ HẠN CHÓT) -->
+      <!-- TAB 2: REMINDERS & CONSIDERATION (NHẮC NHỞ & HỘP THƯ HỌC VỤ) -->
       <section id="remindersTab" class="hidden">
         <div class="dashboard-header">
           <div>
-            <h2 class="section-title">Nhắc nhở & Hạn chót</h2>
-            <p class="section-subtitle">Học phí, sinh hoạt công dân và khảo sát</p>
+            <h2 class="section-title">Nhắc nhở & Hộp thư</h2>
+            <p class="section-subtitle">Tổng hợp hộp thư cá nhân, học phí, lịch thi và thông báo học vụ toàn trường</p>
           </div>
           <div class="header-actions">
             <button class="btn-secondary" onclick="loadConsiderations(true)">
-              🔄 Quét thông báo
+              🔄 Quét lại thông báo
             </button>
+          </div>
+        </div>
+
+        <!-- Quick Summary Metrics -->
+        <div class="reminders-summary-bar" id="remindersSummaryBar" style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+          <div class="stat-badge-card" style="flex: 1; min-width: 140px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: var(--radius-md); padding: 12px 16px;">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 500;">✉️ Hộp thư cá nhân</div>
+            <div id="countPersonalNotices" style="font-size: 20px; font-weight: 700; color: #c084fc; margin-top: 4px;">0</div>
+          </div>
+          <div class="stat-badge-card" style="flex: 1; min-width: 140px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: var(--radius-md); padding: 12px 16px;">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 500;">🎯 Lịch thi sắp tới</div>
+            <div id="countExamNotices" style="font-size: 20px; font-weight: 700; color: #f87171; margin-top: 4px;">0</div>
+          </div>
+          <div class="stat-badge-card" style="flex: 1; min-width: 140px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: var(--radius-md); padding: 12px 16px;">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 500;">📢 Thông báo trường</div>
+            <div id="countGeneralNotices" style="font-size: 20px; font-weight: 700; color: #38bdf8; margin-top: 4px;">0</div>
+          </div>
+        </div>
+
+        <!-- Filter Pills & Search Row -->
+        <div style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+          <div class="filter-pills-row" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="filter-chip active" id="chipAll" onclick="setNoticeFilter('all')">Tất cả <span id="badgeAll">0</span></button>
+            <button class="filter-chip" id="chipPersonal" onclick="setNoticeFilter('personal')">✉️ Hộp thư cá nhân <span id="badgePersonal">0</span></button>
+            <button class="filter-chip" id="chipExam" onclick="setNoticeFilter('exam')">🎯 Lịch thi <span id="badgeExam">0</span></button>
+            <button class="filter-chip" id="chipTuition" onclick="setNoticeFilter('tuition')">💳 Học phí & Hạn chót <span id="badgeTuition">0</span></button>
+            <button class="filter-chip" id="chipGeneral" onclick="setNoticeFilter('general')">📢 Thông báo trường <span id="badgeGeneral">0</span></button>
+          </div>
+          <div style="min-width: 240px; flex: 1; max-width: 320px;">
+            <input type="text" id="noticeSearchInput" class="input-control" placeholder="🔍 Tìm kiếm thông báo..." oninput="onNoticeSearchChange(this.value)" style="padding: 7px 12px; font-size: 12.5px;">
           </div>
         </div>
 
@@ -2152,6 +2124,8 @@
       scheduleViewMode: 'matrix',
       currentWeekMonday: null,
       selectedDayIndex: (new Date().getDay() + 6) % 7,
+      noticeFilter: 'all',
+      noticeSearch: '',
     };
 
     // Centralized Authenticated Fetch Wrapper
@@ -2162,8 +2136,8 @@
         'X-Session-Token': token
       };
       const res = await fetch(url, options);
-      // Only force logout if core session validation fails, preventing false logouts on background tasks
-      if (res.status === 401 && (url === '/api/status' || url.startsWith('/api/overview'))) {
+      // Only force logout if core session validation fails on /api/status, preventing false logouts on overview or background tasks
+      if (res.status === 401 && url === '/api/status') {
         localStorage.removeItem('hcmute_session_token');
         appState.authenticated = false;
         appState.profile = null;
@@ -2216,10 +2190,6 @@
       document.getElementById('mainNav').classList.add('hidden');
       document.getElementById('userPill').classList.add('hidden');
       document.getElementById('logoutBtn').classList.add('hidden');
-      const fab = document.getElementById('fabAiChat');
-      if (fab) fab.classList.add('hidden');
-      const drawer = document.getElementById('aiChatDrawer');
-      if (drawer) drawer.classList.add('hidden');
     }
 
     function showDashboard() {
@@ -2228,8 +2198,6 @@
       document.getElementById('mainNav').classList.remove('hidden');
       document.getElementById('userPill').classList.remove('hidden');
       document.getElementById('logoutBtn').classList.remove('hidden');
-      const fab = document.getElementById('fabAiChat');
-      if (fab) fab.classList.remove('hidden');
 
       if (appState.profile) {
         document.getElementById('userNameDisplay').textContent =
@@ -2473,11 +2441,12 @@
         try {
           data = await res.json();
         } catch(e) {
-          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
-          errorDiv.classList.remove('hidden');
+          grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Máy chủ đang phản hồi chậm hoặc đang khởi động. Vui lòng thử lại sau giây lát.</div>`;
           return;
         }
-        if (!data.success) throw new Error(data.message);
+        if (!data || !data.success) {
+          throw new Error(data?.message || 'Không thể đồng bộ dữ liệu lúc này.');
+        }
 
         appState.classes = data.classes || [];
         appState.exams = data.exams || [];
@@ -3149,6 +3118,45 @@
       }).join('');
     }
 
+    function updateNoticeCounters() {
+      const all = appState.considerations || [];
+      const personalCount = all.filter(it => it.notice_type === 'personal' || it.category === 'PERSONAL').length;
+      const examCount = all.filter(it => it.notice_type === 'exam' || it.category === 'EXAM').length;
+      const tuitionCount = all.filter(it => it.category === 'TUITION' || (it.title && it.title.toLowerCase().includes('học phí'))).length;
+      const generalCount = all.filter(it => it.notice_type === 'general' && it.category !== 'TUITION' && it.category !== 'EXAM').length;
+
+      const elP = document.getElementById('countPersonalNotices');
+      if (elP) elP.textContent = personalCount;
+      const elE = document.getElementById('countExamNotices');
+      if (elE) elE.textContent = examCount;
+      const elG = document.getElementById('countGeneralNotices');
+      if (elG) elG.textContent = generalCount;
+
+      const bAll = document.getElementById('badgeAll');
+      if (bAll) bAll.textContent = all.length;
+      const bP = document.getElementById('badgePersonal');
+      if (bP) bP.textContent = personalCount;
+      const bE = document.getElementById('badgeExam');
+      if (bE) bE.textContent = examCount;
+      const bT = document.getElementById('badgeTuition');
+      if (bT) bT.textContent = tuitionCount;
+      const bG = document.getElementById('badgeGeneral');
+      if (bG) bG.textContent = generalCount;
+    }
+
+    function setNoticeFilter(filterType) {
+      appState.noticeFilter = filterType;
+      document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById(`chip${filterType.charAt(0).toUpperCase() + filterType.slice(1)}`);
+      if (activeBtn) activeBtn.classList.add('active');
+      renderConsiderationsList();
+    }
+
+    function onNoticeSearchChange(query) {
+      appState.noticeSearch = (query || '').trim().toLowerCase();
+      renderConsiderationsList();
+    }
+
     async function loadConsiderations(force = false) {
       const list = document.getElementById('remindersList');
       if (!list) return;
@@ -3159,11 +3167,11 @@
         return;
       }
 
-      list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Đang phân tích thông báo, kiểm tra hạn nộp học phí, SHCD...</div>`;
+      list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Đang tổng hợp hộp thư cá nhân, kiểm tra học phí và quét thông báo học vụ...</div>`;
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds client timeout
+        const timeoutId = setTimeout(() => controller.abort(), 9000); // 9 seconds client timeout
 
         const res = await apiFetch('/api/considerations' + (force ? '?force=1' : ''), {
           signal: controller.signal
@@ -3205,15 +3213,60 @@
 
     function renderConsiderationsList() {
       const list = document.getElementById('remindersList');
-      if (!appState.considerations || appState.considerations.length === 0) {
-        list.innerHTML = `<div class="empty-state"><div class="empty-icon">✨</div>Tuyệt vời! Không phát hiện thông báo nào có hạn chót khẩn cấp trong thời gian tới.</div>`;
+      if (!list) return;
+
+      const all = appState.considerations || [];
+      updateNoticeCounters();
+
+      // 1. Filter by category
+      let filtered = all;
+      const filter = appState.noticeFilter || 'all';
+      if (filter === 'personal') {
+        filtered = filtered.filter(it => it.notice_type === 'personal' || it.category === 'PERSONAL');
+      } else if (filter === 'exam') {
+        filtered = filtered.filter(it => it.notice_type === 'exam' || it.category === 'EXAM');
+      } else if (filter === 'tuition') {
+        filtered = filtered.filter(it => it.category === 'TUITION' || (it.title && it.title.toLowerCase().includes('học phí')));
+      } else if (filter === 'general') {
+        filtered = filtered.filter(it => it.notice_type === 'general' && it.category !== 'TUITION' && it.category !== 'EXAM');
+      }
+
+      // 2. Filter by search query
+      const search = appState.noticeSearch;
+      if (search) {
+        filtered = filtered.filter(it => {
+          const t = (it.title || '').toLowerCase();
+          const s = (it.sender || '').toLowerCase();
+          const a = (it.action || '').toLowerCase();
+          const r = (it.recommendation || '').toLowerCase();
+          return t.includes(search) || s.includes(search) || a.includes(search) || r.includes(search);
+        });
+      }
+
+      if (filtered.length === 0) {
+        if (all.length === 0) {
+          list.innerHTML = `<div class="empty-state"><div class="empty-icon">✨</div>Hiện tại bạn không có thông báo hay hạn chót nào trong hộp thư.</div>`;
+        } else {
+          list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Không tìm thấy thông báo nào phù hợp với bộ lọc hoặc từ khóa "${escapeHtml(search)}".</div>`;
+        }
         return;
       }
 
-      list.innerHTML = appState.considerations.map(it => {
+      list.innerHTML = filtered.map(it => {
         const isSelected = appState.selectedReminderIds.has(it.id);
         const isHigh = it.priority === 'HIGH';
         const cardClass = isHigh ? 'reminder-card high-priority' : 'reminder-card medium-priority';
+
+        let typePill = '';
+        if (it.notice_type === 'personal' || it.category === 'PERSONAL') {
+          typePill = `<span class="notice-type-pill personal">✉️ Hộp thư cá nhân</span>`;
+        } else if (it.notice_type === 'exam' || it.category === 'EXAM') {
+          typePill = `<span class="notice-type-pill exam">🎯 Lịch thi</span>`;
+        } else if (it.category === 'TUITION' || (it.title && it.title.toLowerCase().includes('học phí'))) {
+          typePill = `<span class="notice-type-pill tuition">💳 Học phí & Nghĩa vụ</span>`;
+        } else {
+          typePill = `<span class="notice-type-pill general">📢 Thông báo trường</span>`;
+        }
 
         let countdownPill = '';
         if (it.days_left !== null && it.days_left !== undefined) {
@@ -3228,24 +3281,33 @@
           } else {
             countdownPill = `<span class="priority-pill" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-blue); border: 1px solid rgba(14, 165, 233, 0.3);">📅 Còn ${it.days_left} ngày</span>`;
           }
+        } else {
+          countdownPill = `<span class="priority-pill" style="background: rgba(255, 255, 255, 0.06); color: var(--text-subtle); border: 1px solid var(--surface-border);">ℹ️ Tin học vụ</span>`;
         }
+
+        const senderStr = it.sender ? `👤 ${escapeHtml(it.sender)}` : '';
+        const dateStr = it.source_date ? `📅 Đăng ngày ${escapeHtml(it.source_date)}` : '';
+        const metaInfo = [senderStr, dateStr].filter(Boolean).join(' • ');
 
         return `
           <div class="${cardClass}">
             <div class="reminder-content">
               <div class="reminder-header" style="flex-wrap: wrap;">
+                ${typePill}
                 ${countdownPill}
-                <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${it.category}</span>
-                ${it.deadline ? `<span class="deadline-pill">⏰ Hạn: ${it.deadline}</span>` : ''}
+                ${it.deadline ? `<span class="deadline-pill">⏰ Hạn chót: ${escapeHtml(it.deadline)}</span>` : ''}
               </div>
-              <h4 class="reminder-title" style="cursor: pointer;" onclick="openNoticeModal('${it.id}', '${it.notice_type || 'personal'}')">${it.title}</h4>
-              <p class="reminder-action">👉 ${it.action}</p>
-              <p class="reminder-reason">💡 ${it.recommendation}</p>
-              <button class="btn-secondary" style="padding: 5px 12px; font-size: 12px; margin-top: 10px;" onclick="openNoticeModal('${it.id}', '${it.notice_type || 'personal'}')">
-                👁️ Xem chi tiết thông báo
-              </button>
+              <h4 class="reminder-title" style="cursor: pointer; margin-top: 6px;" onclick="openNoticeModal('${it.id}', '${it.notice_type || 'general'}')">${escapeHtml(it.title)}</h4>
+              ${metaInfo ? `<div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">${metaInfo}</div>` : ''}
+              <p class="reminder-action">👉 ${escapeHtml(it.action)}</p>
+              <p class="reminder-reason">💡 ${escapeHtml(it.recommendation)}</p>
+              <div style="display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap;">
+                <button class="btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="openNoticeModal('${it.id}', '${it.notice_type || 'general'}')">
+                  👁️ Xem chi tiết thông báo
+                </button>
+              </div>
             </div>
-            <label class="ios-switch" title="Chọn thêm vào lịch">
+            <label class="ios-switch" title="Chọn đồng bộ vào lịch">
               <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleReminder('${it.id}', this.checked)">
               <span class="slider"></span>
             </label>
@@ -3271,14 +3333,20 @@
         try {
           data = await res.json();
         } catch(e) {
-          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
-          errorDiv.classList.remove('hidden');
+          titleEl.textContent = 'Máy chủ đang phản hồi chậm';
+          bodyEl.innerHTML = '<p>Vui lòng thử lại sau giây lát.</p>';
           return;
         }
-        if (!data.success) throw new Error(data.message);
+        if (!data || !data.success) throw new Error(data?.message || 'Không tìm thấy nội dung thông báo');
 
         titleEl.textContent = data.subject || 'Chi tiết thông báo';
         metaEl.textContent = `${data.sender || 'HCMUTE'} • ${data.date || ''}`;
+        bodyEl.innerHTML = data.content_html || '<p>Không có nội dung chi tiết.</p>';
+      } catch (err) {
+        titleEl.textContent = 'Lỗi hiển thị thông báo';
+        bodyEl.innerHTML = `<p style="color: var(--accent-red);">Không thể tải nội dung: ${err.message}</p>`;
+      }
+    }
         bodyEl.innerHTML = data.content_html || '<p>Không có nội dung chi tiết.</p>';
       } catch (err) {
         titleEl.textContent = 'Lỗi hiển thị thông báo';
@@ -3608,104 +3676,6 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    /* AI Chat Assistant (UTE_Cal) */
-    function toggleAiChatDrawer() {
-      const drawer = document.getElementById('aiChatDrawer');
-      if (!drawer) return;
-      drawer.classList.toggle('hidden');
-      if (!drawer.classList.contains('hidden')) {
-        const inp = document.getElementById('chatDrawerInput');
-        if (inp) inp.focus();
-      }
-    }
-
-    function sendQuickPrompt(promptText) {
-      const inp = document.getElementById('chatDrawerInput');
-      if (inp) {
-        inp.value = promptText;
-        sendChatMessage();
-      }
-    }
-
-    async function sendChatMessage() {
-      const inp = document.getElementById('chatDrawerInput');
-      const messagesContainer = document.getElementById('chatDrawerMessages');
-      if (!inp || !messagesContainer) return;
-
-      const userText = inp.value.trim();
-      if (!userText) return;
-
-      inp.value = '';
-
-      // User bubble
-      const userBubble = document.createElement('div');
-      userBubble.className = 'chat-bubble user';
-      userBubble.textContent = userText;
-      messagesContainer.appendChild(userBubble);
-
-      // Bot thinking bubble
-      const botBubble = document.createElement('div');
-      botBubble.className = 'chat-bubble bot';
-      botBubble.innerHTML = '<span style="opacity: 0.7;">⚡ UTE_Cal đang tra cứu...</span>';
-      messagesContainer.appendChild(botBubble);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-      try {
-        const token = localStorage.getItem('hcmute_session_token') || '';
-        const res = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Session-Token': token
-          },
-          body: JSON.stringify({ message: userText })
-        });
-        const data = await res.json();
-        if (data.reply) {
-          botBubble.innerHTML = data.reply.replace(/\n/g, '<br>');
-        } else {
-          botBubble.innerHTML = 'Xin lỗi bạn, không nhận được phản hồi từ trợ lý.';
-        }
-      } catch (err) {
-        botBubble.innerHTML = 'Lỗi kết nối tới máy chủ. Vui lòng thử lại sau giây lát nhé!';
-      }
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
   </script>
-
-  <!-- Floating AI Assistant UTE_Cal FAB Button -->
-  <button id="fabAiChat" class="fab-chat hidden" onclick="toggleAiChatDrawer()" title="Hỏi trợ lý UTE_Cal">
-    <span style="font-size: 16px;">🤖</span>
-    <span>Hỏi UTE_Cal</span>
-  </button>
-
-  <!-- Floating AI Assistant Drawer -->
-  <div id="aiChatDrawer" class="ai-chat-drawer hidden">
-    <div class="chat-drawer-header">
-      <div class="chat-drawer-title">
-        <span>🤖</span>
-        <span>Trợ lý UTE_Cal</span>
-        <span style="font-size: 10px; background: rgba(14, 165, 233, 0.2); color: var(--accent-blue); padding: 2px 7px; border-radius: 10px; font-weight: 600;">Groq LPU</span>
-      </div>
-      <button onclick="toggleAiChatDrawer()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px;">✕</button>
-    </div>
-    <div id="chatDrawerMessages" class="chat-drawer-messages">
-      <div class="chat-bubble bot">
-        👋 Xin chào! Mình là <b>UTE_Cal</b>, trợ lý học tập HCMUTE của bạn. Bạn muốn hỏi về lịch học, ngày thi, phòng học hay điều gì nè?
-      </div>
-    </div>
-    <div class="chat-quick-prompts">
-      <div class="chat-prompt-pill" onclick="sendQuickPrompt('Hôm nay tôi có học môn gì không?')">📅 Hôm nay học gì?</div>
-      <div class="chat-prompt-pill" onclick="sendQuickPrompt('Môn thi tiếp theo là gì, ở phòng nào?')">🎯 Môn thi kế tiếp?</div>
-      <div class="chat-prompt-pill" onclick="sendQuickPrompt('Tuần này có môn nào nghỉ không?')">🔍 Môn nghỉ tuần này?</div>
-      <div class="chat-prompt-pill" onclick="sendQuickPrompt('Cách tính điểm rèn luyện HCMUTE?')">📜 Điểm rèn luyện?</div>
-    </div>
-    <div class="chat-drawer-input-row">
-      <input type="text" id="chatDrawerInput" class="input-control" placeholder="Hỏi UTE_Cal bất cứ điều gì..." style="font-size: 12.5px; padding: 8px 12px;" onkeydown="if(event.key==='Enter') sendChatMessage()">
-      <button class="btn-primary" style="padding: 8px 14px; font-size: 13px;" onclick="sendChatMessage()">
-        Gửi
-      </button>
-    </div>
-  </div>
 </body>
 </html>

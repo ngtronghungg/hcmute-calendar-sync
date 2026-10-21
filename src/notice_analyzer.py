@@ -47,6 +47,7 @@ class ConsiderationItem:
         is_reminder_needed: bool = True,
         notice_type: str = "general",
         full_content: str = "",
+        sender: str = "",
     ):
         self.item_id = str(item_id)
         self.title = title
@@ -63,6 +64,7 @@ class ConsiderationItem:
         self.is_reminder_needed = is_reminder_needed
         self.notice_type = notice_type
         self.full_content = full_content
+        self.sender = sender
 
     def to_calendar_event(self) -> Optional[CalendarEvent]:
         """Convert this reminder consideration into a CalendarEvent."""
@@ -206,10 +208,17 @@ class NoticeAnalyzer:
             },
             "REGISTRATION": {
                 "title": "Đăng ký môn học / Rút môn",
-                "keywords": ["đăng ký môn học", "dkmh", "rút môn học", "hủy học phần", "đăng ký học lại"],
+                "keywords": ["đăng ký môn học", "dkmh", "rút môn học", "hủy học phần", "đăng ký học lại", "kế hoạch học tập"],
                 "priority": "HIGH",
                 "recommendation": "Đăng ký hoặc hủy môn đúng hạn để hoàn thiện kế hoạch học tập.",
                 "action": "Truy cập cổng đăng ký môn học và thực hiện thao tác đúng thời gian quy định.",
+            },
+            "EXAM": {
+                "title": "Lịch thi & Phúc khảo",
+                "keywords": ["lịch thi", "phúc khảo", "hoãn thi", "thi bù", "điểm thi", "kết quả thi"],
+                "priority": "HIGH",
+                "recommendation": "Lịch thi hoặc thời hạn nộp đơn phúc khảo kết thúc học phần.",
+                "action": "Kiểm tra phòng thi, giờ thi hoặc nộp đơn phúc khảo trực tuyến nếu cần.",
             },
             "SURVEY": {
                 "title": "Khảo sát ý kiến sinh viên",
@@ -218,12 +227,33 @@ class NoticeAnalyzer:
                 "recommendation": "Khảo sát sinh viên là điều kiện để xem điểm thi hoặc đăng ký môn học đợt sau.",
                 "action": "Truy cập mục Đánh giá giảng viên / Khảo sát trên online.hcmute.edu.vn và gửi phiếu.",
             },
-            "EXAM": {
-                "title": "Lịch thi & Phúc khảo",
-                "keywords": ["lịch thi", "phúc khảo", "hoãn thi", "thi bù", "điểm thi"],
+            "ACADEMIC": {
+                "title": "Giảng viên & Học vụ",
+                "keywords": ["bài tập", "tiểu luận", "đồ án", "báo cáo", "kiểm tra", "giữa kỳ", "thuyết trình", "thực hành", "phòng học", "đổi phòng", "nghỉ học", "học bù", "lớp học phần"],
+                "priority": "MEDIUM",
+                "recommendation": "Thông tin học phần và dặn dò từ giảng viên bộ môn.",
+                "action": "Xem chi tiết hướng dẫn của giảng viên và theo dõi lịch lớp học.",
+            },
+            "SCHOLARSHIP": {
+                "title": "Học bổng & Hỗ trợ",
+                "keywords": ["học bổng", "trợ cấp", "miễn giảm", "khuyến khích", "tài trợ", "hỗ trợ sinh viên"],
                 "priority": "HIGH",
-                "recommendation": "Lịch thi hoặc thời hạn nộp đơn phúc khảo kết thúc học phần.",
-                "action": "Kiểm tra phòng thi, giờ thi hoặc nộp đơn phúc khảo trực tuyến nếu cần.",
+                "recommendation": "Cơ hội nhận học bổng khuyến khích học tập hoặc hỗ trợ tài chính.",
+                "action": "Chuẩn bị hồ sơ minh chứng và nộp về phòng Công tác Sinh viên đúng hạn.",
+            },
+            "GRADUATION": {
+                "title": "Đề tài tốt nghiệp & Thực tập",
+                "keywords": ["tốt nghiệp", "khóa luận", "đề tài", "thực tập", "doanh nghiệp", "tuyển dụng", "việc làm"],
+                "priority": "HIGH",
+                "recommendation": "Kế hoạch thực tập tốt nghiệp và đăng ký đề tài chuyên ngành.",
+                "action": "Nộp đơn đăng ký đề tài hoặc liên hệ đơn vị thực tập theo quy định.",
+            },
+            "ACTIVITY": {
+                "title": "Hoạt động & Rèn luyện",
+                "keywords": ["đoàn", "hội", "rèn luyện", "drl", "tình nguyện", "mùa hè xanh", "hiến máu", "ngày hội", "workshop", "hội thảo", "seminar", "clb"],
+                "priority": "MEDIUM",
+                "recommendation": "Cộng điểm rèn luyện và nâng cao kỹ năng mềm.",
+                "action": "Đăng ký tham gia sự kiện và điểm danh để được tích lũy điểm rèn luyện.",
             },
         }
 
@@ -234,7 +264,8 @@ class NoticeAnalyzer:
     ) -> Optional[ConsiderationItem]:
         """
         Analyze an announcement dictionary (general or personal).
-        Decrypts body if needed and extracts future deadlines accurately.
+        Decrypts body if needed, extracts future deadlines accurately,
+        and preserves all authentic university communications without dropping.
         """
         title = (
             notice.get("MessageSubject")
@@ -244,6 +275,14 @@ class NoticeAnalyzer:
             or ""
         ).strip()
 
+        sender = (
+            notice.get("SenderName")
+            or notice.get("StaffName")
+            or notice.get("NguoiGui")
+            or notice.get("DepartmentName")
+            or ("Giảng viên / Khoa" if notice_type == "personal" else "Phòng Đào tạo HCMUTE")
+        ).strip()
+
         # Get body and decrypt if encrypted base64
         raw_content = (
             notice.get("MessageBody")
@@ -251,7 +290,7 @@ class NoticeAnalyzer:
             or notice.get("Content")
             or ""
         )
-        decrypted_content = decrypt_hcmute_body(raw_content) if notice_type == "personal" else raw_content
+        decrypted_content = decrypt_hcmute_body(raw_content) if (notice_type == "personal" and raw_content) else raw_content
 
         if not title and decrypted_content:
             clean_snippet = re.sub(r"<[^>]+>", " ", decrypted_content)
@@ -263,6 +302,9 @@ class NoticeAnalyzer:
                 title = clean_snippet[:80].strip() + ("..." if len(clean_snippet) > 80 else "")
             else:
                 title = "Thông báo học vụ"
+
+        if not title and not decrypted_content:
+            return None
 
         notice_id = str(
             notice.get("MessageID")
@@ -304,12 +346,26 @@ class NoticeAnalyzer:
                 matched_category = "GENERAL"
                 matched_rule = {
                     "title": "Thông báo có hạn chót",
-                    "priority": "MEDIUM",
+                    "priority": "HIGH",
                     "recommendation": "Thông báo có thời hạn cần thực hiện.",
                     "action": "Xem toàn văn thông báo để làm theo hướng dẫn.",
                 }
+            elif notice_type == "personal":
+                matched_category = "PERSONAL"
+                matched_rule = {
+                    "title": "Hộp thư cá nhân",
+                    "priority": "MEDIUM",
+                    "recommendation": f"Tin nhắn từ {sender}.",
+                    "action": "Xem nội dung tin nhắn và thực hiện theo dặn dò.",
+                }
             else:
-                return None
+                matched_category = "GENERAL"
+                matched_rule = {
+                    "title": "Thông báo học vụ",
+                    "priority": "NORMAL",
+                    "recommendation": "Thông báo học vụ từ nhà trường.",
+                    "action": "Xem toàn văn thông báo để cập nhật thông tin.",
+                }
 
         # Extract dates
         dates = extract_dates_from_text(full_text)
@@ -317,33 +373,41 @@ class NoticeAnalyzer:
 
         # Filter strictly future dates
         future_dates = [d for d in dates if d >= now - timedelta(days=1)]
-        if not future_dates:
-            # If no active future deadline was found, do NOT show it as an upcoming reminder!
-            return None
+        if future_dates:
+            deadline_dt = min(future_dates)
+            is_reminder_needed = True
+        else:
+            deadline_dt = None
+            is_reminder_needed = False
 
-        # Choose the earliest future deadline
-        deadline_dt = min(future_dates)
+        category_title = matched_rule.get("title", "")
+        if category_title in ("Hộp thư cá nhân", "Thông báo học vụ", "Thông báo chung"):
+            display_title = title
+        elif category_title and not title.lower().startswith(category_title.lower()):
+            display_title = f"{category_title}: {title}"
+        else:
+            display_title = title
 
-        clean_title = f"{matched_rule.get('title')}: {title}"
-        if len(clean_title) > 95:
-            clean_title = clean_title[:92] + "..."
+        if len(display_title) > 110:
+            display_title = display_title[:107] + "..."
 
         item = ConsiderationItem(
             item_id=notice_id,
-            title=clean_title,
+            title=display_title,
             category=matched_category,
             priority=matched_rule.get("priority", "MEDIUM"),
             deadline=deadline_dt,
             summary=title,
             action_required=matched_rule.get("action", "Xem nội dung thông báo"),
-            recommendation=matched_rule.get("recommendation", "Cần lưu ý thời hạn thông báo"),
+            recommendation=matched_rule.get("recommendation", f"Thông báo từ {sender}"),
             source_title=title,
             source_id=notice_id,
             source_date=created_dt,
             confidence_score=0.95,
-            is_reminder_needed=True,
+            is_reminder_needed=is_reminder_needed,
             notice_type=notice_type,
             full_content=decrypted_content,
+            sender=sender,
         )
         return item
 

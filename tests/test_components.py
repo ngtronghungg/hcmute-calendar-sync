@@ -111,6 +111,36 @@ class TestNoticeAnalyzer(unittest.TestCase):
         self.assertEqual(item.priority, "HIGH")
         self.assertIn("Sinh hoạt công dân", item.title)
 
+    def test_personal_message_preservation(self):
+        """Ensure personal inbox messages from instructors without explicit future dates are never dropped."""
+        personal_msg = {
+            "MessageID": "2001",
+            "MessageSubject": "Dặn dò ôn tập môn Cơ sở dữ liệu và nộp đề tài qua email",
+            "MessageBody": "Các em gửi báo cáo bài tập lớn trước tuần 12 vào email thầy.",
+            "SenderName": "TS. Trần Văn B",
+            "CreationDate": "2026-10-18T10:00:00",
+        }
+        item = self.analyzer.analyze_announcement(personal_msg, notice_type="personal")
+        self.assertIsNotNone(item)
+        self.assertEqual(item.notice_type, "personal")
+        self.assertEqual(item.sender, "TS. Trần Văn B")
+        self.assertIn("Cơ sở dữ liệu", item.title)
+
+    def test_general_announcement_preservation(self):
+        """Ensure general university announcements without future deadlines are retained as informative notices."""
+        general_notice = {
+            "MaTin": "3001",
+            "TieuDe": "Thông báo v/v Tổ chức Ngày hội việc làm và Kết nối Doanh nghiệp năm 2026",
+            "NoiDung": "Phòng Quan hệ Doanh nghiệp kính mời các bạn sinh viên tham dự ngày hội.",
+            "StaffName": "Phòng Tuyển sinh và Quan hệ Doanh nghiệp",
+            "CreateDate": "2026-10-19T08:30:00",
+        }
+        item = self.analyzer.analyze_announcement(general_notice, notice_type="general")
+        self.assertIsNotNone(item)
+        self.assertEqual(item.notice_type, "general")
+        self.assertIn("Ngày hội việc làm", item.title)
+        self.assertEqual(item.sender, "Phòng Tuyển sinh và Quan hệ Doanh nghiệp")
+
     def test_ics_export(self):
         ev = CalendarEvent(
             uid="test-1",

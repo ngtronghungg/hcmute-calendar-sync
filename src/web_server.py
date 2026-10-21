@@ -57,31 +57,45 @@ SESSIONS_FILE = os.path.join(PROJECT_ROOT, "data", "sessions.json")
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path="")
 
 import secrets
+import threading
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 ACTIVE_SESSIONS: Dict[str, dict] = {}
+SESSION_LOCK = threading.RLock()
 
 
 def load_sessions() -> None:
-    """Load active student sessions from disk."""
+    """Load active student sessions from disk thread-safely without wiping memory on read errors."""
     global ACTIVE_SESSIONS
-    if os.path.exists(SESSIONS_FILE):
-        try:
-            with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
-                ACTIVE_SESSIONS = json.load(f)
-        except Exception:
-            ACTIVE_SESSIONS = {}
+    with SESSION_LOCK:
+        if os.path.exists(SESSIONS_FILE):
+            try:
+                with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        for k, v in data.items():
+                            if k not in ACTIVE_SESSIONS:
+                                ACTIVE_SESSIONS[k] = v
+            except Exception:
+                pass
 
 
 def save_sessions() -> None:
-    """Persist active student sessions to disk."""
-    try:
-        os.makedirs(os.path.dirname(SESSIONS_FILE), exist_ok=True)
-        with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
-            json.dump(ACTIVE_SESSIONS, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    """Persist active student sessions to disk atomically and thread-safely."""
+    with SESSION_LOCK:
+        try:
+            os.makedirs(os.path.dirname(SESSIONS_FILE), exist_ok=True)
+            tmp_file = f"{SESSIONS_FILE}.tmp.{os.getpid()}.{secrets.token_hex(4)}"
+            with open(tmp_file, "w", encoding="utf-8") as f:
+                json.dump(ACTIVE_SESSIONS, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_file, SESSIONS_FILE)
+        except Exception:
+            try:
+                if 'tmp_file' in locals() and os.path.exists(tmp_file):
+                    os.remove(tmp_file)
+            except Exception:
+                pass
 
 
 load_sessions()
@@ -125,16 +139,17 @@ def get_request_session() -> Optional[dict]:
     if not token:
         return None
 
-    if token not in ACTIVE_SESSIONS:
-        # Reload from disk in case another worker process or server restart occurred
-        load_sessions()
+    with SESSION_LOCK:
+        if token not in ACTIVE_SESSIONS:
+            # Reload from disk in case another worker process or server restart occurred
+            load_sessions()
 
-    if token not in ACTIVE_SESSIONS:
-        return None
+        if token not in ACTIVE_SESSIONS:
+            return None
 
-    session = ACTIVE_SESSIONS[token]
-    session["last_active"] = datetime.now(timezone.utc).isoformat()
-    return session
+        session = ACTIVE_SESSIONS[token]
+        session["last_active"] = datetime.now(timezone.utc).isoformat()
+        return session
 
 
 def get_session_client(session: Optional[dict] = None) -> Optional[HCMUTEClient]:
@@ -427,8 +442,9 @@ def api_login():
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "last_active": datetime.now(timezone.utc).isoformat(),
             }
-            ACTIVE_SESSIONS[session_token] = session_rec
-            save_sessions()
+            with SESSION_LOCK:
+                ACTIVE_SESSIONS[session_token] = session_rec
+                save_sessions()
             record_student_access(mssv=session_payload["Id"], name=session_payload["FullName"], channel="Web Portal (Token)")
             resp = jsonify({
                 "success": True,
@@ -474,8 +490,9 @@ def api_login():
             "created_at": datetime.now(timezone.utc).isoformat(),
             "last_active": datetime.now(timezone.utc).isoformat(),
         }
-        ACTIVE_SESSIONS[session_token] = session_rec
-        save_sessions()
+        with SESSION_LOCK:
+            ACTIVE_SESSIONS[session_token] = session_rec
+            save_sessions()
 
         record_student_access(mssv=mssv, name=name, channel="Web Portal")
         resp = jsonify({
@@ -540,8 +557,9 @@ def api_login_google():
             "created_at": datetime.now(timezone.utc).isoformat(),
             "last_active": datetime.now(timezone.utc).isoformat(),
         }
-        ACTIVE_SESSIONS[session_token] = session_rec
-        save_sessions()
+        with SESSION_LOCK:
+            ACTIVE_SESSIONS[session_token] = session_rec
+            save_sessions()
 
         record_student_access(mssv=mssv, name=name, channel="Web Portal (Google)")
         resp = jsonify({
@@ -566,9 +584,10 @@ def api_logout():
     session = get_request_session()
     if session:
         token = session.get("session_token")
-        if token and token in ACTIVE_SESSIONS:
-            del ACTIVE_SESSIONS[token]
-            save_sessions()
+        with SESSION_LOCK:
+            if token and token in ACTIVE_SESSIONS:
+                del ACTIVE_SESSIONS[token]
+                save_sessions()
     resp = jsonify({"success": True})
     resp.delete_cookie("hcmute_session")
     return resp
@@ -640,9 +659,10 @@ def api_security_wipe():
 
     if session:
         token = session.get("session_token")
-        if token and token in ACTIVE_SESSIONS:
-            del ACTIVE_SESSIONS[token]
-            save_sessions()
+        with SESSION_LOCK:
+            if token and token in ACTIVE_SESSIONS:
+                del ACTIVE_SESSIONS[token]
+                save_sessions()
 
     if mssv:
         user_dir = os.path.join(PROJECT_ROOT, "data", "users", mssv)
@@ -696,36 +716,45 @@ def api_overview():
 
     try:
         try:
-            yt = client.get_year_and_term()
-            available_years = yt.get("YearStudy") or available_years
-            available_terms = yt.get("Terms") or available_terms
-            curr_year = request.args.get("year") or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
-            curr_term = request.args.get("term") or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
+            from concurrent.futures import ThreadPoolExecutor, wait
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                fut_yt = pool.submit(client.get_year_and_term)
+                try:
+                    yt = fut_yt.result(timeout=3.0)
+                    available_years = yt.get("YearStudy") or available_years
+                    available_terms = yt.get("Terms") or available_terms
+                    curr_year = request.args.get("year") or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
+                    curr_term = request.args.get("term") or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
+                except Exception:
+                    pass
 
-            # Concurrent parallel fetching of semester schedule and exams
-            from concurrent.futures import ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=3) as pool:
                 fut_sched = pool.submit(client.get_schedule_semester, curr_year, curr_term)
                 fut_time_exams = pool.submit(client.get_exams_by_time)
                 fut_term_exams = pool.submit(client.get_exam_schedule, curr_year, curr_term)
 
-                try:
-                    raw_sched = fut_sched.result(timeout=15)
-                    all_class_events = parse_semester_schedule(raw_sched)
-                    if all_class_events:
-                        save_feed_cache(all_class_events, mssv=mssv)
-                except Exception:
-                    pass
+                # Bounded fast timeout: never hang the browser or kick the user out
+                done, _ = wait([fut_sched, fut_time_exams, fut_term_exams], timeout=4.5)
 
-                try:
-                    all_raw_exams.extend(fut_time_exams.result(timeout=15))
-                except Exception:
-                    pass
+                if fut_sched in done:
+                    try:
+                        raw_sched = fut_sched.result()
+                        all_class_events = parse_semester_schedule(raw_sched)
+                        if all_class_events:
+                            save_feed_cache(all_class_events, mssv=mssv)
+                    except Exception:
+                        pass
 
-                try:
-                    all_raw_exams.extend(fut_term_exams.result(timeout=15))
-                except Exception:
-                    pass
+                if fut_time_exams in done:
+                    try:
+                        all_raw_exams.extend(fut_time_exams.result())
+                    except Exception:
+                        pass
+
+                if fut_term_exams in done:
+                    try:
+                        all_raw_exams.extend(fut_term_exams.result())
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -915,29 +944,33 @@ def api_considerations():
         # 2. Concurrently fetch Personal Notices, General Notices & Fee Debt with strict timeouts
         def fetch_personal():
             try:
-                personal_notices = client.get_personal_messages()[:5]
-                for p in personal_notices:
-                    mid = p.get("MessageID") or p.get("Id")
-                    if mid and "MessageBody" not in p:
-                        try:
-                            p_detail = client.get_message_detail(mid)
-                            p["MessageBody"] = p_detail.get("MessageBody", "")
-                            p["SenderName"] = p_detail.get("SenderName", "")
-                        except Exception:
-                            pass
-                    item = analyzer.analyze_announcement(p, notice_type="personal")
-                    if item:
-                        all_items.append(item)
+                personal_notices = client.get_personal_messages()
+                if not isinstance(personal_notices, list):
+                    return
+                # Capture up to 30 authentic personal inbox messages
+                for p in personal_notices[:30]:
+                    try:
+                        item = analyzer.analyze_announcement(p, notice_type="personal")
+                        if item:
+                            all_items.append(item)
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
         def fetch_general():
             try:
-                general_notices = client.get_general_announcements()[:8]
-                for g in general_notices:
-                    item = analyzer.analyze_announcement(g, notice_type="general")
-                    if item:
-                        all_items.append(item)
+                general_notices = client.get_general_announcements()
+                if not isinstance(general_notices, list):
+                    return
+                # Capture up to 30 university-wide announcements
+                for g in general_notices[:30]:
+                    try:
+                        item = analyzer.analyze_announcement(g, notice_type="general")
+                        if item:
+                            all_items.append(item)
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -955,21 +988,33 @@ def api_considerations():
             f3 = executor.submit(fetch_tuition)
             for fut in [f1, f2, f3]:
                 try:
-                    fut.result(timeout=5)
+                    fut.result(timeout=6)
                 except Exception:
                     pass
 
-        # STRICT SORTING: NEAREST DEADLINE FIRST!
-        all_items.sort(key=lambda x: x.deadline or datetime(2099, 1, 1))
+        # SORTING STRATEGY:
+        # Group 0: Urgent upcoming deadlines (nearest to today first: 0d, 1d, 3d...)
+        # Group 1: Fresh announcements & personal messages without fixed deadline (newest creation date first)
+        # Group 2: Past deadlines
+        def sort_key(it):
+            if it.deadline:
+                if it.deadline >= now - timedelta(days=1):
+                    return (0, it.deadline.timestamp())
+                else:
+                    return (2, -it.deadline.timestamp())
+            else:
+                ts = it.source_date.timestamp() if it.source_date else 0
+                return (1, -ts)
+
+        all_items.sort(key=sort_key)
 
         # Deduplicate items with similar titles and same deadline
         deduped_items = []
         seen_keys = set()
         for it in all_items:
             dl_str = it.deadline.strftime("%Y%m%d") if it.deadline else "no_dl"
-            # Normalize title words
-            clean_words = "".join(filter(str.isalnum, (it.title or "").lower()))[:25]
-            key = f"{it.category}_{dl_str}_{clean_words}"
+            clean_words = "".join(filter(str.isalnum, (it.title or "").lower()))[:30]
+            key = f"{it.notice_type}_{it.category}_{dl_str}_{clean_words}"
             if key in seen_keys:
                 continue
             seen_keys.add(key)
@@ -992,6 +1037,8 @@ def api_considerations():
                 "action": it.action_required,
                 "recommendation": it.recommendation,
                 "source_title": it.source_title,
+                "source_date": it.source_date.strftime("%d/%m/%Y") if it.source_date else None,
+                "sender": getattr(it, "sender", "") or "Phòng Đào tạo HCMUTE",
                 "is_needed": it.is_reminder_needed,
                 "notice_type": it.notice_type,
             })

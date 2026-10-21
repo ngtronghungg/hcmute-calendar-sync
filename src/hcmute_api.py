@@ -5,9 +5,12 @@ Direct REST integration with https://portalapi.hcmute.edu.vn/api/
 
 import os
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 import requests
+from requests.adapters import HTTPAdapter
+
+VN_TZ = timezone(timedelta(hours=7))
 
 
 class HCMUTEClient:
@@ -25,6 +28,9 @@ class HCMUTEClient:
         self.session_data: Optional[Dict[str, Any]] = None
         self.token: Optional[str] = None
         self.session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=1)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         if self.token_cache_file:
             self.load_cached_session()
 
@@ -54,8 +60,8 @@ class HCMUTEClient:
                 expire_dt = datetime.fromisoformat(expire_str.replace("Z", "+00:00"))
                 now = datetime.now(timezone.utc)
                 if expire_dt.tzinfo is None:
-                    expire_dt = expire_dt.replace(tzinfo=timezone.utc)
-                if now > expire_dt:
+                    expire_dt = expire_dt.replace(tzinfo=VN_TZ)
+                if now > expire_dt.astimezone(timezone.utc):
                     return False
 
             self.session_data = data

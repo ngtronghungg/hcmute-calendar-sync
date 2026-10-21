@@ -156,6 +156,7 @@ class TestMultiUserSessions(unittest.TestCase):
         res_index = self.client.get("/")
         self.assertIn("no-store", res_index.headers.get("Cache-Control", ""))
         self.assertIn("max-age=0", res_index.headers.get("Cache-Control", ""))
+        res_index.close()
 
         # Check logout clears cookie
         res_logout = self.client.post("/api/logout")
@@ -173,6 +174,29 @@ class TestMultiUserSessions(unittest.TestCase):
         res_invalid = self.client.post("/api/login/google", json={"credential": "invalid_dummy_token"})
         self.assertEqual(res_invalid.status_code, 401)
         self.assertFalse(res_invalid.get_json()["success"])
+
+    def test_concurrent_session_access(self):
+        """Simulate concurrent threads writing and reading sessions to prove atomic file operations."""
+        import concurrent.futures
+        from src.web_server import load_sessions
+
+        def worker(idx):
+            token = f"stress_test_token_{idx}"
+            ACTIVE_SESSIONS[token] = {
+                "session_token": token,
+                "mssv": f"201100{idx:02d}",
+                "name": f"Sinh Viên {idx}",
+                "portal_token": f"jwt_{idx}",
+            }
+            save_sessions()
+            load_sessions()
+            return token in ACTIVE_SESSIONS
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            results = list(executor.map(worker, range(20)))
+
+        self.assertTrue(all(results))
+        self.assertGreaterEqual(len(ACTIVE_SESSIONS), 20)
 
 
 if __name__ == "__main__":
