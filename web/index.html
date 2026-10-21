@@ -1531,7 +1531,7 @@
   <main>
 
     <!-- 1. LOGIN VIEW -->
-    <div class="login-wrapper hidden" id="loginView">
+    <div class="login-wrapper" id="loginView">
       <div class="login-icon">🎓</div>
       <h1 class="login-title">UTECal</h1>
       <p class="login-desc">Đồng bộ thời khóa biểu và lịch thi vào điện thoại</p>
@@ -1569,22 +1569,6 @@
           <div style="font-size: 12px; color: var(--accent-blue); line-height: 1.5; margin-bottom: 14px; background: rgba(14, 165, 233, 0.08); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(14, 165, 233, 0.2);">
             💡 <strong>Dành cho sinh viên đăng nhập Google:</strong> Nếu bạn đăng nhập cổng trường bằng Google, hãy mở <a href="https://online.hcmute.edu.vn" target="_blank" style="color: #38bdf8; font-weight: 600;">online.hcmute.edu.vn</a> ➔ F12 (Application ➔ LocalStorage) copy <code>Token</code> và dán vào bên dưới:
           </div>
-          <div class="form-group">
-            <label class="form-label">MSSV (Tùy chọn)</label>
-            <input type="text" id="tokenMssvInput" class="input-control" placeholder="Nhập MSSV gồm 8 chữ số...">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Bearer Token</label>
-            <textarea id="tokenRawInput" class="input-control" rows="3" placeholder="eyJhbGciOi..." required style="font-family: var(--font-mono); font-size: 12px; resize: none;"></textarea>
-          </div>
-          <button type="submit" class="btn-primary" id="loginTokenSubmitBtn" style="width: 100%; margin-top: 8px;">
-            <span>Đồng bộ bằng Token</span>
-          </button>
-        </form>
-      </div>
-
-        <!-- Token-Only Form -->
-        <form id="formLoginToken" class="hidden" onsubmit="handleTokenLogin(event)">
           <div class="form-group">
             <label class="form-label">MSSV (Tùy chọn)</label>
             <input type="text" id="tokenMssvInput" class="input-control" placeholder="Nhập MSSV gồm 8 chữ số...">
@@ -3341,12 +3325,6 @@
 
         titleEl.textContent = data.subject || 'Chi tiết thông báo';
         metaEl.textContent = `${data.sender || 'HCMUTE'} • ${data.date || ''}`;
-        bodyEl.innerHTML = data.content_html || '<p>Không có nội dung chi tiết.</p>';
-      } catch (err) {
-        titleEl.textContent = 'Lỗi hiển thị thông báo';
-        bodyEl.innerHTML = `<p style="color: var(--accent-red);">Không thể tải nội dung: ${err.message}</p>`;
-      }
-    }
         bodyEl.innerHTML = data.content_html || '<p>Không có nội dung chi tiết.</p>';
       } catch (err) {
         titleEl.textContent = 'Lỗi hiển thị thông báo';
