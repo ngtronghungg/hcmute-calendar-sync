@@ -120,13 +120,20 @@ class GoogleCalendarSync:
             },
         }
 
-        # Color codes: 11=Red (Deadline), 5=Yellow (Class), 4=Flamingo/Orange (Exam)
-        if event.event_type == "DEADLINE":
-            body["colorId"] = "11"  # Tomato/Red
-        elif event.event_type == "EXAM":
-            body["colorId"] = "4"   # Flamingo
-        elif event.event_type == "CLASS":
-            body["colorId"] = "9"   # Blueberry
+        # Distinct Google Calendar Color Mapping:
+        # Color 11 (Tomato - Bright Red): Exclusively reserved for EXAM (Lịch thi)
+        # Color 4  (Flamingo - Coral/Orange): DEADLINE / Nhắc nhở
+        # Color 1..10: Deterministic distinct colors assigned to each subject
+        if getattr(event, "color_id", None):
+            body["colorId"] = str(event.color_id)
+        elif (event.event_type or "").upper() == "EXAM":
+            body["colorId"] = "11"  # Tomato (Bright Red - Lịch thi)
+        elif (event.event_type or "").upper() == "DEADLINE":
+            body["colorId"] = "4"   # Flamingo (Cam hồng)
+        else:
+            from src.schedule_parser import get_course_color
+            cid, _ = get_course_color(event.title)
+            body["colorId"] = cid
 
         # Reminders
         if reminder_minutes:
@@ -168,6 +175,9 @@ class GoogleCalendarSync:
         created_count = 0
         updated_count = 0
         error_count = 0
+
+        from src.schedule_parser import assign_course_colors
+        assign_course_colors(events)
 
         # Retrieve existing events in calendar by querying private extendedProperties
         for idx, event in enumerate(events):

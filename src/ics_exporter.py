@@ -23,6 +23,10 @@ def create_ical_calendar(
     cal.add("x-wr-calname", calendar_name)
     cal.add("x-wr-timezone", "Asia/Ho_Chi_Minh")
 
+    import re
+    from src.schedule_parser import assign_course_colors, get_course_color
+    assign_course_colors(events)
+
     for ev in events:
         ie = ICalEvent()
         ie.add("summary", ev.title)
@@ -38,8 +42,25 @@ def create_ical_calendar(
         if ev.description:
             ie.add("description", ev.description)
 
-        # Set category
-        ie.add("categories", [ev.category, "HCMUTE"])
+        ev_type = (ev.event_type or "").upper()
+        # Set category, priority & distinct color (RFC 7986 / Apple Calendar)
+        if ev_type == "EXAM":
+            ie.add("color", "#d50000")  # Bright Red for exams
+            ie.add("x-apple-calendar-color", "#d50000")
+            ie.add("priority", 1)  # Highest priority
+            ie.add("categories", ["LỊCH THI", "EXAM", "QUAN TRỌNG", "HCMUTE"])
+        elif ev_type == "DEADLINE":
+            ie.add("color", "#e67c73")
+            ie.add("x-apple-calendar-color", "#e67c73")
+            ie.add("priority", 2)
+            ie.add("categories", ["NHẮC NHỞ", "DEADLINE", "HCMUTE"])
+        else:
+            hex_c = getattr(ev, "color_hex", "") or get_course_color(ev.title)[1]
+            ie.add("color", hex_c)
+            ie.add("x-apple-calendar-color", hex_c)
+            ie.add("priority", 5)
+            clean_sub = re.sub(r"\[.*?\]|\(.*?\)", "", ev.title).strip()
+            ie.add("categories", [clean_sub or "THỜI KHÓA BIỂU", "CLASS", "HCMUTE"])
 
         # Configure alarms
         if add_reminders:

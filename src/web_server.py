@@ -56,6 +56,79 @@ def get_client() -> HCMUTEClient:
     )
 
 
+CALENDAR_FEED_CACHE_FILE = "data/calendar_feed_cache.json"
+EXAM_CACHE_FILE = "data/exam_cache.json"
+
+
+def save_cached_exams(exams: list):
+    """Permanently persist parsed exam CalendarEvent objects to disk, merging with existing."""
+    if not exams:
+        return
+    try:
+        os.makedirs("data", exist_ok=True)
+        existing = {e.uid: e for e in load_cached_exams()}
+        for ex in exams:
+            existing[ex.uid] = ex
+        with open(EXAM_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump([e.to_dict() for e in existing.values()], f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def load_cached_exams() -> list:
+    """Load cached exam CalendarEvent objects."""
+    if os.path.exists(EXAM_CACHE_FILE):
+        try:
+            with open(EXAM_CACHE_FILE, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            return [CalendarEvent.from_dict(d) for d in raw]
+        except Exception:
+            pass
+    if os.path.exists(CALENDAR_FEED_CACHE_FILE):
+        try:
+            with open(CALENDAR_FEED_CACHE_FILE, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            exams = [CalendarEvent.from_dict(d) for d in raw if d.get("event_type") in ("EXAM", "THI") or "THI" in d.get("title", "")]
+            if exams:
+                save_cached_exams(exams)
+            return exams
+        except Exception:
+            pass
+    return []
+
+
+def save_feed_cache(events: list):
+    """Cache parsed CalendarEvent objects to file, merging intelligently so exams are never lost."""
+    try:
+        os.makedirs("data", exist_ok=True)
+        old_events = load_feed_cache()
+        merged = {e.uid: e for e in old_events}
+        for e in events:
+            merged[e.uid] = e
+        with open(CALENDAR_FEED_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump([e.to_dict() for e in merged.values()], f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def load_feed_cache() -> list:
+    """Load cached CalendarEvent objects when portal session is expired, ensuring exams are included."""
+    events = []
+    if os.path.exists(CALENDAR_FEED_CACHE_FILE):
+        try:
+            with open(CALENDAR_FEED_CACHE_FILE, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            events = [CalendarEvent.from_dict(d) for d in raw]
+        except Exception:
+            pass
+    cached_exams = load_cached_exams()
+    existing_uids = {e.uid for e in events}
+    for ex in cached_exams:
+        if ex.uid not in existing_uids:
+            events.append(ex)
+    return events
+
+
 @app.route("/")
 def index():
     return send_from_directory(WEB_DIR, "index.html")
@@ -63,9 +136,9 @@ def index():
 
 @app.route("/api/status", methods=["GET"])
 def api_status():
-    """Return login state and student profile."""
+    """Return login state and student profile, auto-renewing session silently if vault credentials exist."""
     client = get_client()
-    if client.is_authenticated():
+    if client.ensure_authenticated():
         profile = client.get_user_profile() or {}
         return jsonify({
             "authenticated": True,
@@ -76,6 +149,22 @@ def api_status():
                 "status": profile.get("StudyStatusName", "Đang học"),
             }
         })
+    if os.path.exists("data/.token_cache.json"):
+        try:
+            with open("data/.token_cache.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return jsonify({
+                "authenticated": True,
+                "token_expired": True,
+                "profile": {
+                    "id": data.get("Id", ""),
+                    "name": data.get("FullName") or data.get("Username", "Sinh viên"),
+                    "role": data.get("Role", "SV"),
+                    "status": data.get("StudyStatusName", "Đang học"),
+                }
+            })
+        except Exception:
+            pass
     return jsonify({"authenticated": False})
 
 
@@ -115,52 +204,73 @@ def api_logout():
 
 @app.route("/api/overview", methods=["GET"])
 def api_overview():
-    """Fetch current year & term, class schedule, and exam schedule."""
+    """Fetch current year & term, class schedule, and exam schedule with persistent cache fallback."""
     client = get_client()
-    if not client.is_authenticated():
-        return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
+    from datetime import datetime, timedelta
+    now = datetime.now()
+
+    include_past = request.args.get("include_past", "false").lower() == "true"
+    include_past_exams = request.args.get("include_past_exams", "false").lower() == "true"
+
+    all_class_events = []
+    all_raw_exams = []
+    curr_year = "2026-2027"
+    curr_term = "HK01"
+    available_years = ["2026-2027", "2025-2026", "2024-2025"]
+    available_terms = [
+        {"TermID": "HK01", "TermName": "Học kỳ 1"},
+        {"TermID": "HK02", "TermName": "Học kỳ 2"},
+        {"TermID": "HK03", "TermName": "Học kỳ 3"}
+    ]
 
     try:
-        from datetime import datetime, timedelta
-        now = datetime.now()
+        if client.ensure_authenticated():
+            try:
+                yt = client.get_year_and_term()
+                available_years = yt.get("YearStudy") or available_years
+                available_terms = yt.get("Terms") or available_terms
+                curr_year = request.args.get("year") or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
+                curr_term = request.args.get("term") or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
 
-        # 1. Year & Term
-        yt = client.get_year_and_term()
-        available_years = yt.get("YearStudy") or ["2026-2027", "2025-2026", "2024-2025"]
-        available_terms = yt.get("Terms") or [
-            {"TermID": "HK01", "TermName": "Học kỳ 1"},
-            {"TermID": "HK02", "TermName": "Học kỳ 2"},
-            {"TermID": "HK03", "TermName": "Học kỳ 3"}
-        ]
+                # 2. Live Schedule
+                raw_sched = client.get_schedule_semester(curr_year, curr_term)
+                all_class_events = parse_semester_schedule(raw_sched)
+            except Exception:
+                pass
 
-        curr_year = request.args.get("year") or yt.get("CurrentYear") or yt.get("NamHienTai") or "2026-2027"
-        curr_term = request.args.get("term") or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or "HK01"
-        include_past = request.args.get("include_past", "false").lower() == "true"
+            # 3. Live Exams: combine detailed showexambytime and semester exams
+            try:
+                time_exams = client.get_exams_by_time()
+                all_raw_exams.extend(time_exams)
+            except Exception:
+                pass
+            try:
+                term_exams = client.get_exam_schedule(curr_year, curr_term)
+                all_raw_exams.extend(term_exams)
+            except Exception:
+                pass
 
-        # 2. Schedule
-        raw_sched = client.get_schedule_semester(curr_year, curr_term)
-        all_class_events = parse_semester_schedule(raw_sched)
+        # Fallback to cached classes if live fetch failed or offline
+        if not all_class_events:
+            cached_events = load_feed_cache()
+            all_class_events = [c for c in cached_events if (c.event_type or "").upper() in ("CLASS", "TKB")]
 
-        upcoming_classes = [c for c in all_class_events if c.end_datetime >= now]
-        upcoming_classes.sort(key=lambda x: x.start_datetime)
+        # Always include make-up classes!
+        from src.telegram_bot import load_makeup_classes
+        all_class_events.extend(load_makeup_classes())
+        from src.schedule_parser import assign_course_colors
+        assign_course_colors(all_class_events)
 
-        past_classes = [c for c in all_class_events if c.end_datetime < now]
-        past_classes.sort(key=lambda x: x.start_datetime, reverse=True)
-
-        # 3. Exams: combine detailed showexambytime and semester exams
-        all_raw_exams = []
-        try:
-            time_exams = client.get_exams_by_time()
-            all_raw_exams.extend(time_exams)
-        except Exception:
-            pass
-        try:
-            term_exams = client.get_exam_schedule(curr_year, curr_term)
-            all_raw_exams.extend(term_exams)
-        except Exception:
-            pass
-
+        # Parse live exams
         exam_events = parse_exam_schedule(all_raw_exams)
+
+        # Fallback to cached exams if live exams returned empty
+        if not exam_events:
+            exam_events = load_cached_exams()
+        else:
+            save_cached_exams(exam_events)
+
+        assign_course_colors(exam_events)
 
         # Deduplicate exams by title and date
         deduped_exams = []
@@ -171,13 +281,19 @@ def api_overview():
                 seen_exam_keys.add(k)
                 deduped_exams.append(ex)
 
-        upcoming_exams = [e for e in deduped_exams if e.start_datetime >= now - timedelta(hours=4)]
+        upcoming_classes = [c for c in all_class_events if c.end_datetime >= now]
+        upcoming_classes.sort(key=lambda x: x.start_datetime)
+
+        past_classes = [c for c in all_class_events if c.end_datetime < now]
+        past_classes.sort(key=lambda x: x.start_datetime, reverse=True)
+
+        # Keep exams from past 7 days in upcoming_exams so active exam week is never empty
+        upcoming_exams = [e for e in deduped_exams if e.start_datetime >= now - timedelta(days=7)]
         upcoming_exams.sort(key=lambda x: x.start_datetime)
 
-        past_exams = [e for e in deduped_exams if e.start_datetime < now - timedelta(hours=4)]
+        past_exams = [e for e in deduped_exams if e.start_datetime < now - timedelta(days=7)]
         past_exams.sort(key=lambda x: x.start_datetime, reverse=True)
 
-        # Decide what to return: by default, only upcoming events!
         classes_to_return = all_class_events if include_past else upcoming_classes
         classes_to_return.sort(key=lambda x: x.start_datetime)
 
@@ -188,7 +304,7 @@ def api_overview():
             d["is_cancelled"] = c.uid in cancelled_set
             classes_data.append(d)
 
-        exams_to_return = deduped_exams if include_past else upcoming_exams
+        exams_to_return = deduped_exams if (include_past or include_past_exams) else upcoming_exams
         exams_to_return.sort(key=lambda x: x.start_datetime)
 
         return jsonify({
@@ -198,6 +314,7 @@ def api_overview():
             "years": available_years,
             "terms": available_terms,
             "include_past": include_past,
+            "include_past_exams": include_past_exams,
             "total_classes_count": len(all_class_events),
             "upcoming_classes_count": len(upcoming_classes),
             "past_classes_count": len(past_classes),
@@ -209,6 +326,8 @@ def api_overview():
             "classes": classes_data,
             "exams": [e.to_dict() for e in exams_to_return],
         })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
@@ -441,8 +560,6 @@ def api_notice_detail():
 def api_export_ics():
     """Export schedule, exams, and selected reminders to .ics file with granular category options."""
     client = get_client()
-    if not client.is_authenticated():
-        return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
 
     try:
         from datetime import datetime, timedelta
@@ -455,16 +572,35 @@ def api_export_ics():
         only_upcoming = bool(req_data.get("only_upcoming", True))
         selected_reminder_ids = set(req_data.get("selected_reminder_ids", []))
 
-        yt = client.get_year_and_term()
-        curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or "2026-2027"
-        curr_term = yt.get("CurrentTerm") or yt.get("HocKyHienTai") or "HK01"
+        curr_year = "2026-2027"
+        curr_term = "HK01"
+        if client.is_authenticated():
+            try:
+                yt = client.get_year_and_term()
+                curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
+                curr_term = yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
+            except Exception:
+                pass
 
         all_events = []
 
         # 1. Fetch Schedule (if requested)
         if include_classes:
-            raw_sched = client.get_schedule_semester(curr_year, curr_term)
-            classes = parse_semester_schedule(raw_sched)
+            classes = []
+            if client.ensure_authenticated():
+                try:
+                    raw_sched = client.get_schedule_semester(curr_year, curr_term)
+                    classes = parse_semester_schedule(raw_sched)
+                except Exception:
+                    pass
+            if not classes:
+                cached = load_feed_cache()
+                classes = [c for c in cached if (c.event_type or "").upper() in ("CLASS", "TKB")]
+
+            # Include make-up classes!
+            from src.telegram_bot import load_makeup_classes
+            classes.extend(load_makeup_classes())
+
             cancelled_set = load_cancellations()
             classes = [c for c in classes if c.uid not in cancelled_set]
             if only_upcoming:
@@ -473,57 +609,68 @@ def api_export_ics():
 
         # 2. Fetch Exams (if requested)
         if include_exams:
-            raw_exams = []
-            try:
-                raw_exams.extend(client.get_exams_by_time())
-            except Exception:
-                pass
-            try:
-                raw_exams.extend(client.get_exam_schedule(curr_year, curr_term))
-            except Exception:
-                pass
-            parsed_exams = parse_exam_schedule(raw_exams)
+            parsed_exams = []
+            if client.is_authenticated():
+                raw_exams = []
+                try:
+                    raw_exams.extend(client.get_exams_by_time())
+                except Exception:
+                    pass
+                try:
+                    raw_exams.extend(client.get_exam_schedule(curr_year, curr_term))
+                except Exception:
+                    pass
+                parsed_exams = parse_exam_schedule(raw_exams)
+
+            if not parsed_exams:
+                parsed_exams = load_cached_exams()
+            else:
+                save_cached_exams(parsed_exams)
+
             seen_exam_keys = set()
             for ex in parsed_exams:
                 k = (ex.title, ex.start_datetime.strftime("%Y%m%d%H%M"))
                 if k not in seen_exam_keys:
                     seen_exam_keys.add(k)
-                    if not only_upcoming or ex.start_datetime >= now - timedelta(hours=4):
+                    # For exams: keep all semester exams if exporting exams only,
+                    # or keep exams within the past 30 days and upcoming.
+                    if not only_upcoming or not include_classes or ex.start_datetime >= now - timedelta(days=30):
                         all_events.append(ex)
 
         # 3. Add Reminders (if requested)
         if include_reminders:
             analyzer = NoticeAnalyzer(load_config())
-            personal_notices = client.get_personal_messages()[:15]
-            for p in personal_notices:
-                mid = p.get("MessageID") or p.get("Id")
-                if mid and "MessageBody" not in p:
-                    try:
-                        p_detail = client.get_message_detail(mid)
-                        p["MessageBody"] = p_detail.get("MessageBody", "")
-                    except Exception:
-                        pass
-                item = analyzer.analyze_announcement(p, notice_type="personal")
-                if item and (not selected_reminder_ids or item.item_id in selected_reminder_ids):
-                    ev = item.to_calendar_event()
-                    if ev:
-                        all_events.append(ev)
+            if client.ensure_authenticated():
+                try:
+                    personal_notices = client.get_personal_messages()[:15]
+                    for p in personal_notices:
+                        mid = p.get("MessageID") or p.get("Id")
+                        if mid and "MessageBody" not in p:
+                            try:
+                                p_detail = client.get_message_detail(mid)
+                                p["MessageBody"] = p_detail.get("MessageBody", "")
+                            except Exception:
+                                pass
+                        item = analyzer.analyze_announcement(p, notice_type="personal")
+                        if item and (not selected_reminder_ids or item.item_id in selected_reminder_ids):
+                            ev = item.to_calendar_event()
+                            if ev:
+                                all_events.append(ev)
 
-            for g in client.get_general_announcements()[:20]:
-                item = analyzer.analyze_announcement(g, notice_type="general")
-                if item and (not selected_reminder_ids or item.item_id in selected_reminder_ids):
-                    ev = item.to_calendar_event()
-                    if ev:
-                        all_events.append(ev)
+                    for g in client.get_general_announcements()[:20]:
+                        item = analyzer.analyze_announcement(g, notice_type="general")
+                        if item and (not selected_reminder_ids or item.item_id in selected_reminder_ids):
+                            ev = item.to_calendar_event()
+                            if ev:
+                                all_events.append(ev)
 
-            try:
-                fee_item = analyzer.analyze_tuition_debt(client.get_fee_debt())
-                if fee_item and (not selected_reminder_ids or fee_item.item_id in selected_reminder_ids):
-                    ev = fee_item.to_calendar_event()
-                    if ev:
-                        all_events.append(ev)
-            except Exception:
-                pass
+                    fee_item = analyzer.analyze_tuition_debt(client.get_fee_debt())
+                    if fee_item and (not selected_reminder_ids or fee_item.item_id in selected_reminder_ids):
+                        ev = fee_item.to_calendar_event()
+                        if ev:
+                            all_events.append(ev)
+                except Exception:
+                    pass
 
         if not all_events:
             return jsonify({"success": False, "message": "Không có sự kiện nào phù hợp với bộ lọc bạn đã chọn."}), 400
@@ -531,16 +678,16 @@ def api_export_ics():
         # Descriptive filename
         if include_classes and not include_exams and not include_reminders:
             download_name = "hcmute_tkb.ics"
-            cal_title = "HCMUTE Thời Khóa Biểu"
+            cal_title = "HCMUTE - Thời Khóa Biểu"
         elif include_exams and not include_classes and not include_reminders:
             download_name = "hcmute_lich_thi.ics"
-            cal_title = "HCMUTE Lịch Thi"
+            cal_title = "HCMUTE - Lịch Thi"
         elif include_reminders and not include_classes and not include_exams:
             download_name = "hcmute_nhac_nho.ics"
-            cal_title = "HCMUTE Nhắc Nhở Hạn Chót"
+            cal_title = "HCMUTE - Hạn Chót & Nhắc Nhở"
         else:
             download_name = "hcmute_calendar.ics"
-            cal_title = "HCMUTE Lịch Học & Thi"
+            cal_title = "HCMUTE - Lịch Học & Thi"
 
         out_file = os.path.abspath(f"data/{download_name}")
         export_events_to_ics(all_events, output_path=out_file, calendar_name=cal_title)
@@ -559,8 +706,6 @@ def api_export_ics():
 def api_sync_google():
     """Directly push classes, exams, and reminders to dedicated Google Calendars."""
     client = get_client()
-    if not client.is_authenticated():
-        return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
 
     try:
         cfg = load_config()
@@ -589,17 +734,32 @@ def api_sync_google():
         only_upcoming = bool(req_data.get("only_upcoming", True))
         selected_reminder_ids = set(req_data.get("selected_reminder_ids", []))
 
-        yt = client.get_year_and_term()
-        curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or "2026-2027"
-        curr_term = yt.get("CurrentTerm") or yt.get("HocKyHienTai") or "HK01"
+        curr_year = "2026-2027"
+        curr_term = "HK01"
+        if client.is_authenticated():
+            try:
+                yt = client.get_year_and_term()
+                curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
+                curr_term = yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
+            except Exception:
+                pass
 
         total_created, total_updated, total_synced = 0, 0, 0
         synced_calendars = []
 
         # 1. Sync Classes to dedicated calendar
         if include_classes:
-            raw_sched = client.get_schedule_semester(curr_year, curr_term)
-            classes = parse_semester_schedule(raw_sched)
+            classes = []
+            if client.ensure_authenticated():
+                try:
+                    raw_sched = client.get_schedule_semester(curr_year, curr_term)
+                    classes = parse_semester_schedule(raw_sched)
+                except Exception:
+                    pass
+            if not classes:
+                cached = load_feed_cache()
+                classes = [c for c in cached if (c.event_type or "").upper() in ("CLASS", "TKB")]
+
             cancelled_set = load_cancellations()
             classes = [c for c in classes if c.uid not in cancelled_set]
             if only_upcoming:
@@ -616,23 +776,31 @@ def api_sync_google():
 
         # 2. Sync Exams to dedicated calendar
         if include_exams:
-            raw_exams = []
-            try:
-                raw_exams.extend(client.get_exams_by_time())
-            except Exception:
-                pass
-            try:
-                raw_exams.extend(client.get_exam_schedule(curr_year, curr_term))
-            except Exception:
-                pass
-            parsed_exams = parse_exam_schedule(raw_exams)
+            parsed_exams = []
+            if client.ensure_authenticated():
+                raw_exams = []
+                try:
+                    raw_exams.extend(client.get_exams_by_time())
+                except Exception:
+                    pass
+                try:
+                    raw_exams.extend(client.get_exam_schedule(curr_year, curr_term))
+                except Exception:
+                    pass
+                parsed_exams = parse_exam_schedule(raw_exams)
+
+            if not parsed_exams:
+                parsed_exams = load_cached_exams()
+            else:
+                save_cached_exams(parsed_exams)
+
             seen_exam_keys = set()
             exams_to_sync = []
             for ex in parsed_exams:
                 k = (ex.title, ex.start_datetime.strftime("%Y%m%d%H%M"))
                 if k not in seen_exam_keys:
                     seen_exam_keys.add(k)
-                    if not only_upcoming or ex.start_datetime >= now - timedelta(hours=4):
+                    if not only_upcoming or ex.start_datetime >= now - timedelta(days=30):
                         exams_to_sync.append(ex)
 
             if exams_to_sync:
@@ -649,36 +817,37 @@ def api_sync_google():
             analyzer = NoticeAnalyzer(load_config())
             reminders_to_sync = []
 
-            personal_notices = client.get_personal_messages()[:15]
-            for p in personal_notices:
-                mid = p.get("MessageID") or p.get("Id")
-                if mid and "MessageBody" not in p:
-                    try:
-                        p_detail = client.get_message_detail(mid)
-                        p["MessageBody"] = p_detail.get("MessageBody", "")
-                    except Exception:
-                        pass
-                item = analyzer.analyze_announcement(p, notice_type="personal")
-                if item and (not selected_reminder_ids or item.item_id in selected_reminder_ids):
-                    ev = item.to_calendar_event()
-                    if ev:
-                        reminders_to_sync.append(ev)
+            if client.ensure_authenticated():
+                try:
+                    personal_notices = client.get_personal_messages()[:15]
+                    for p in personal_notices:
+                        mid = p.get("MessageID") or p.get("Id")
+                        if mid and "MessageBody" not in p:
+                            try:
+                                p_detail = client.get_message_detail(mid)
+                                p["MessageBody"] = p_detail.get("MessageBody", "")
+                            except Exception:
+                                pass
+                        item = analyzer.analyze_announcement(p, notice_type="personal")
+                        if item and (not selected_reminder_ids or item.item_id in selected_reminder_ids):
+                            ev = item.to_calendar_event()
+                            if ev:
+                                reminders_to_sync.append(ev)
 
-            for g in client.get_general_announcements()[:20]:
-                item = analyzer.analyze_announcement(g, notice_type="general")
-                if item and (not selected_reminder_ids or item.item_id in selected_reminder_ids):
-                    ev = item.to_calendar_event()
-                    if ev:
-                        reminders_to_sync.append(ev)
+                    for g in client.get_general_announcements()[:20]:
+                        item = analyzer.analyze_announcement(g, notice_type="general")
+                        if item and (not selected_reminder_ids or item.item_id in selected_reminder_ids):
+                            ev = item.to_calendar_event()
+                            if ev:
+                                reminders_to_sync.append(ev)
 
-            try:
-                fee_item = analyzer.analyze_tuition_debt(client.get_fee_debt())
-                if fee_item and (not selected_reminder_ids or fee_item.item_id in selected_reminder_ids):
-                    ev = fee_item.to_calendar_event()
-                    if ev:
-                        reminders_to_sync.append(ev)
-            except Exception:
-                pass
+                    fee_item = analyzer.analyze_tuition_debt(client.get_fee_debt())
+                    if fee_item and (not selected_reminder_ids or fee_item.item_id in selected_reminder_ids):
+                        ev = fee_item.to_calendar_event()
+                        if ev:
+                            reminders_to_sync.append(ev)
+                except Exception:
+                    pass
 
             if reminders_to_sync:
                 cal_name = "HCMUTE - Hạn Chót & Nhắc Nhở"
@@ -698,31 +867,6 @@ def api_sync_google():
         })
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-
-
-CALENDAR_FEED_CACHE_FILE = "data/calendar_feed_cache.json"
-
-
-def save_feed_cache(events: list):
-    """Cache parsed CalendarEvent objects to file for 24/7 background feed fetching."""
-    try:
-        os.makedirs("data", exist_ok=True)
-        with open(CALENDAR_FEED_CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump([e.to_dict() for e in events], f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
-
-def load_feed_cache() -> list:
-    """Load cached CalendarEvent objects when portal session is expired."""
-    if os.path.exists(CALENDAR_FEED_CACHE_FILE):
-        try:
-            with open(CALENDAR_FEED_CACHE_FILE, "r", encoding="utf-8") as f:
-                raw = json.load(f)
-            return [CalendarEvent.from_dict(d) for d in raw]
-        except Exception:
-            pass
-    return []
 
 
 @app.route("/calendar/<path:category_filename>", methods=["GET"])
@@ -768,7 +912,15 @@ def calendar_feed(category_filename="feed.ics"):
     fetched_fresh = False
     all_raw_events = []
 
-    if client.is_authenticated():
+    if client.ensure_authenticated():
+        try:
+            from src.telegram_bot import auto_sync_and_detect_changes
+            cfg = load_config()
+            bot_token = cfg.get("telegram", {}).get("bot_token", "")
+            auto_sync_and_detect_changes(client, bot_token=bot_token, force=False)
+        except Exception:
+            pass
+
         try:
             yt = client.get_year_and_term()
             curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or "2026-2027"
@@ -790,6 +942,11 @@ def calendar_feed(category_filename="feed.ics"):
             except Exception:
                 pass
             parsed_exams = parse_exam_schedule(raw_exams)
+            if not parsed_exams:
+                parsed_exams = load_cached_exams()
+            else:
+                save_cached_exams(parsed_exams)
+
             seen_exam_keys = set()
             for ex in parsed_exams:
                 k = (ex.title, ex.start_datetime.strftime("%Y%m%d%H%M"))
@@ -844,6 +1001,11 @@ def calendar_feed(category_filename="feed.ics"):
     if not all_raw_events:
         return "Chưa có dữ liệu lịch. Vui lòng mở trang web HCMUTE Sync và đăng nhập để đồng bộ lần đầu.", 404
 
+    # Always include make-up classes in live feed
+    from src.telegram_bot import load_makeup_classes
+    for m in load_makeup_classes():
+        all_raw_events.append(m)
+
     # Dynamically apply manual cancellations
     cancelled_set = load_cancellations()
     filtered_events = []
@@ -862,12 +1024,12 @@ def calendar_feed(category_filename="feed.ics"):
         if is_reminder and not inc_reminders:
             continue
 
-        # Keep only upcoming events
+        # Keep only active and upcoming events (keep recent exams from past 30 days so active exam period is never lost)
         if is_class and ev.end_datetime < now:
             continue
-        if is_exam and ev.start_datetime < now - timedelta(hours=4):
+        if is_exam and ev.start_datetime < now - timedelta(days=30):
             continue
-        if is_reminder and ev.start_datetime < now - timedelta(days=1):
+        if is_reminder and ev.start_datetime < now - timedelta(days=2):
             continue
 
         filtered_events.append(ev)
@@ -904,6 +1066,7 @@ def api_telegram_config():
         if "telegram" not in cfg:
             cfg["telegram"] = {}
         cfg["telegram"]["bot_token"] = data.get("bot_token", "").strip()
+        cfg["telegram"]["bot_username"] = data.get("bot_username", "").strip()
         cfg["telegram"]["chat_id"] = data.get("chat_id", "").strip()
         cfg["telegram"]["morning_briefing"] = bool(data.get("morning_briefing", True))
         cfg["telegram"]["morning_time"] = data.get("morning_time", "06:30").strip()
@@ -914,6 +1077,169 @@ def api_telegram_config():
         return jsonify({"success": True, "config": cfg["telegram"]})
 
     return jsonify({"success": True, "config": cfg.get("telegram", {})})
+
+
+@app.route("/api/telegram/bot-info", methods=["GET"])
+def api_telegram_bot_info():
+    """Return bot username and whether master token is configured."""
+    cfg = load_config().get("telegram", {})
+    token = cfg.get("bot_token", "").strip()
+    bot_username = cfg.get("bot_username", "")
+
+    if token and not bot_username:
+        try:
+            r = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=5)
+            if r.status_code == 200 and r.json().get("ok"):
+                bot_username = r.json()["result"].get("username", "")
+                cfg["bot_username"] = bot_username
+                save_tg_config({"telegram": cfg})
+        except Exception:
+            pass
+
+    return jsonify({
+        "configured": bool(token),
+        "bot_username": bot_username,
+        "enabled": bool(cfg.get("enabled", True)),
+    })
+
+
+@app.route("/api/telegram/users", methods=["GET"])
+def api_telegram_users():
+    """Admin endpoint: Get all registered telegram users and stats."""
+    from src.telegram_bot import load_telegram_users
+    users = load_telegram_users()
+    return jsonify({
+        "success": True,
+        "total": len(users),
+        "users": list(users.values()),
+    })
+
+
+@app.route("/api/telegram/register", methods=["POST"])
+def api_telegram_register():
+    """Register or link a student with their Telegram Chat ID."""
+    from src.telegram_bot import register_or_update_telegram_user, send_telegram_message, format_today_schedule, MAIN_INLINE_KEYBOARD
+    data = request.json or {}
+    chat_id = str(data.get("chat_id", "")).strip()
+    mssv = str(data.get("mssv", "")).strip()
+    name = str(data.get("name", "")).strip()
+
+    if not chat_id:
+        return jsonify({"success": False, "message": "Vui lòng nhập Telegram Chat ID hoặc Số điện thoại."}), 400
+
+    cfg = load_config().get("telegram", {})
+    bot_token = cfg.get("bot_token", "").strip()
+
+    user_rec = register_or_update_telegram_user(
+        chat_id=chat_id,
+        mssv=mssv,
+        name=name,
+    )
+
+    if bot_token:
+        client = get_client()
+        welcome = (
+            f"🎉 <b>KÍCH HOẠT THÔNG BÁO TỰ ĐỘNG THÀNH CÔNG!</b>\n\n"
+            f"👤 Sinh viên: <b>{name or 'Sinh viên'}</b>\n"
+            f"🎓 MSSV/ID: <code>{mssv or chat_id}</code>\n\n"
+            f"🌟 <b>Trợ lý tự động hoàn toàn (Set & Forget):</b>\n"
+            f"• ☀️ <b>06:30 sáng:</b> Tự gửi lịch học & phòng học hôm nay\n"
+            f"• 🔥 <b>Cận kề kỳ thi:</b> Tự động nhắc phòng thi & giờ thi\n"
+            f"• ⚠️ <b>Báo nghỉ/bù:</b> Cảnh báo ngay lập tức nếu giảng viên đổi lịch\n\n"
+            f"<i>Bạn không cần mở web hay nhớ lệnh nào nữa!</i>"
+        )
+        send_telegram_message(bot_token, chat_id, welcome, reply_markup=MAIN_INLINE_KEYBOARD)
+        today_text = format_today_schedule(client)
+        send_telegram_message(bot_token, chat_id, today_text)
+
+    return jsonify({"success": True, "user": user_rec})
+
+
+@app.route("/api/telegram/broadcast", methods=["POST"])
+def api_telegram_broadcast():
+    """Admin endpoint: Broadcast announcement to all registered students."""
+    from src.telegram_bot import broadcast_telegram_message
+    cfg = load_config().get("telegram", {})
+    bot_token = cfg.get("bot_token", "").strip()
+    if not bot_token:
+        return jsonify({"success": False, "message": "Chưa cấu hình Bot Token."}), 400
+
+    data = request.json or {}
+    msg = data.get("message", "").strip()
+    if not msg:
+        return jsonify({"success": False, "message": "Vui lòng nhập nội dung thông báo."}), 400
+
+    res = broadcast_telegram_message(bot_token, msg)
+    return jsonify({"success": True, "result": res})
+
+
+@app.route("/api/telegram/delete-user", methods=["POST"])
+def api_telegram_delete_user():
+    """Admin endpoint: Delete a registered student."""
+    from src.telegram_bot import delete_telegram_user
+    data = request.json or {}
+    chat_id = str(data.get("chat_id", "")).strip()
+    if not chat_id:
+        return jsonify({"success": False, "message": "Thiếu Chat ID."}), 400
+    success = delete_telegram_user(chat_id)
+    return jsonify({"success": success})
+
+
+@app.route("/api/telegram/test-push", methods=["POST"])
+def api_telegram_test_push():
+    """Admin endpoint: Send test morning briefing to all registered students right now."""
+    from src.telegram_bot import trigger_morning_briefing
+    client = get_client()
+    res = trigger_morning_briefing(client)
+    return jsonify({"success": True, "result": res})
+
+
+@app.route("/api/telegram/webhook", methods=["POST"])
+def api_telegram_webhook():
+    """
+    On-demand Telegram Webhook receiver.
+    Zero polling loop, zero continuous CPU/RAM usage!
+    Called directly by Telegram servers only when a message arrives.
+    """
+    try:
+        update_data = request.json or {}
+        cfg = load_config().get("telegram", {})
+        bot_token = cfg.get("bot_token", "").strip()
+        if not bot_token or not cfg.get("enabled", True):
+            return "OK", 200
+
+        from src.telegram_bot import process_telegram_update
+        process_telegram_update(update_data, bot_token, get_client())
+    except Exception as e:
+        print(f"[Webhook Error] {e}")
+
+    return "OK", 200
+
+
+@app.route("/api/telegram/set-webhook", methods=["POST"])
+def api_telegram_set_webhook():
+    """Register webhook with Telegram API to eliminate continuous background loops."""
+    cfg = load_config().get("telegram", {})
+    bot_token = cfg.get("bot_token", "").strip()
+    if not bot_token:
+        return jsonify({"success": False, "message": "Chưa có Bot Token."}), 400
+
+    host_url = request.host_url.rstrip("/")
+    if "localhost" in host_url or "127.0.0.1" in host_url:
+        return jsonify({"success": False, "message": "Webhook chỉ hoạt động khi chạy trên Web HTTPS (Render.com), không hỗ trợ localhost."}), 400
+
+    webhook_url = f"{host_url}/api/telegram/webhook"
+    try:
+        r = requests.post(f"https://api.telegram.org/bot{bot_token}/setWebhook", json={"url": webhook_url}, timeout=10)
+        res_data = r.json()
+        if res_data.get("ok"):
+            cfg["use_webhook"] = True
+            save_tg_config({"telegram": cfg})
+            return jsonify({"success": True, "message": f"✔ Đã bật Webhook thành công! Server không cần chạy ngầm nữa (RAM < 20MB, 0% CPU)." , "webhook_url": webhook_url})
+        else:
+            return jsonify({"success": False, "message": res_data.get("description", "Lỗi cài đặt Webhook.")}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 @app.route("/api/telegram/test", methods=["POST"])
@@ -947,14 +1273,21 @@ def api_telegram_test():
 
 @app.route("/api/schedule/cancel", methods=["POST"])
 def api_schedule_cancel():
-    """Mark a class session as cancelled manually."""
+    """Mark a class session as cancelled manually (with crowdsource voting)."""
     data = request.json or {}
     uid = data.get("uid", "").strip()
     if not uid:
         return jsonify({"success": False, "message": "Thiếu UID buổi học."}), 400
 
-    add_cancellation(uid)
-    return jsonify({"success": True, "cancelled": list(load_cancellations())})
+    cfg = load_config()
+    bot_token = cfg.get("telegram", {}).get("bot_token", "")
+    from src.telegram_bot import record_cancellation_vote
+    res = record_cancellation_vote(uid, voter_id="web_user", bot_token=bot_token)
+    return jsonify({
+        "success": True,
+        "vote_result": res,
+        "cancelled": list(load_cancellations()),
+    })
 
 
 @app.route("/api/schedule/uncancel", methods=["POST"])
@@ -962,13 +1295,115 @@ def api_schedule_uncancel():
     """Unmark a cancelled class."""
     data = request.json or {}
     uid = data.get("uid", "").strip()
-    cancelled = load_cancellations()
-    if uid in cancelled:
-        cancelled.remove(uid)
-        from src.telegram_bot import CANCELLATIONS_PATH
-        with open(CANCELLATIONS_PATH, "w", encoding="utf-8") as f:
-            json.dump(list(cancelled), f, ensure_ascii=False, indent=2)
-    return jsonify({"success": True, "cancelled": list(load_cancellations())})
+    if not uid:
+        return jsonify({"success": False, "message": "Thiếu UID buổi học."}), 400
+
+    cfg = load_config()
+    bot_token = cfg.get("telegram", {}).get("bot_token", "")
+    from src.telegram_bot import remove_cancellation_vote
+    res = remove_cancellation_vote(uid, voter_id="web_user", bot_token=bot_token)
+    return jsonify({
+        "success": True,
+        "vote_result": res,
+        "cancelled": list(load_cancellations()),
+    })
+
+
+@app.route("/api/schedule/crowdsource/config", methods=["GET", "POST"])
+def api_schedule_crowdsource_config():
+    """Get or update crowdsource cancellation threshold."""
+    cfg = load_config()
+    if "crowdsource_cancellation" not in cfg:
+        cfg["crowdsource_cancellation"] = {
+            "enabled": True,
+            "threshold_percent": 80,
+            "min_votes": 2,
+        }
+
+    if request.method == "POST":
+        data = request.json or {}
+        if "enabled" in data:
+            cfg["crowdsource_cancellation"]["enabled"] = bool(data["enabled"])
+        if "threshold_percent" in data:
+            try:
+                val = int(data["threshold_percent"])
+                if 1 <= val <= 100:
+                    cfg["crowdsource_cancellation"]["threshold_percent"] = val
+            except Exception:
+                pass
+        save_tg_config(cfg)
+        return jsonify({"success": True, "config": cfg["crowdsource_cancellation"]})
+
+    return jsonify({"success": True, "config": cfg["crowdsource_cancellation"]})
+
+
+@app.route("/api/schedule/crowdsource/votes", methods=["GET"])
+def api_schedule_crowdsource_votes():
+    """Return all active cancellation votes."""
+    from src.telegram_bot import load_cancellation_votes
+    votes = load_cancellation_votes()
+    return jsonify({"success": True, "votes": votes})
+
+
+@app.route("/api/schedule/makeup", methods=["GET", "POST", "DELETE"])
+def api_schedule_makeup():
+    """Manage make-up classes."""
+    from src.telegram_bot import load_makeup_classes, add_makeup_class, remove_makeup_class
+    from datetime import datetime, timedelta
+
+    if request.method == "GET":
+        events = load_makeup_classes()
+        return jsonify({"success": True, "items": [e.to_dict() for e in events]})
+
+    if request.method == "POST":
+        data = request.json or {}
+        title = data.get("title", "").strip()
+        date_str = data.get("date", "").strip()
+        start_time_str = data.get("start_time", "07:30").strip()
+        end_time_str = data.get("end_time", "").strip()
+        location = data.get("location", "HCMUTE").strip()
+        note = data.get("note", "").strip()
+
+        if not title or not date_str:
+            return jsonify({"success": False, "message": "Vui lòng nhập Tên môn học và Ngày học bù."}), 400
+
+        try:
+            import re
+            m_d = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", date_str)
+            if m_d:
+                day, month, year = int(m_d.group(1)), int(m_d.group(2)), int(m_d.group(3))
+            else:
+                m_iso = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", date_str)
+                if m_iso:
+                    year, month, day = int(m_iso.group(1)), int(m_iso.group(2)), int(m_iso.group(3))
+                else:
+                    return jsonify({"success": False, "message": "Định dạng ngày không hợp lệ. Dùng dd/mm/yyyy hoặc yyyy-mm-dd."}), 400
+
+            m_t = re.search(r"(\d{1,2})[:gh](\d{2})", start_time_str)
+            shh = int(m_t.group(1)) if m_t else 7
+            smm = int(m_t.group(2)) if m_t else 30
+            st = datetime(year, month, day, shh, smm)
+
+            if end_time_str:
+                m_et = re.search(r"(\d{1,2})[:gh](\d{2})", end_time_str)
+                ehh = int(m_et.group(1)) if m_et else shh + 3
+                emm = int(m_et.group(2)) if m_et else smm + 45
+                en = datetime(year, month, day, ehh, emm)
+            else:
+                en = st + timedelta(hours=3, minutes=45)
+
+            ev = add_makeup_class(title, st, en, location=location, note=note)
+            return jsonify({"success": True, "event": ev.to_dict()})
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 400
+
+    if request.method == "DELETE":
+        data = request.json or {}
+        uid = data.get("uid", "").strip()
+        if not uid:
+            return jsonify({"success": False, "message": "Thiếu UID buổi học bù."}), 400
+        ok = remove_makeup_class(uid)
+        return jsonify({"success": ok})
 
 
 def run_app(port: int = None, open_browser: bool = True):

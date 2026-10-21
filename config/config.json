@@ -122,5 +122,10 @@
     "morning_time": "06:30",
     "exam_alert": true,
     "diff_alert": true
+  },
+  "crowdsource_cancellation": {
+    "enabled": true,
+    "threshold_percent": 80,
+    "min_votes": 2
   }
 }

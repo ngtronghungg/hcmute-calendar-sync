@@ -70,13 +70,88 @@ class HCMUTEClient:
         self.session_data = data
         self.token = data.get("Token")
 
+    def save_vault(self, username: str, password: str, account_type: int = 0) -> None:
+        """Store student credentials locally for silent automatic background re-authentication."""
+        import base64
+        try:
+            vault_dir = os.path.dirname(self.token_cache_file) or "data"
+            os.makedirs(vault_dir, exist_ok=True)
+            vault_path = os.path.join(vault_dir, ".auth_vault.json")
+            enc_pass = base64.b64encode(password.encode("utf-8")).decode("utf-8")
+            data = {
+                "username": username.strip(),
+                "p_token": enc_pass,
+                "type": account_type,
+            }
+            with open(vault_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def load_vault(self) -> Optional[Dict[str, Any]]:
+        """Load stored credentials for silent re-authentication."""
+        import base64
+        vault_dir = os.path.dirname(self.token_cache_file) or "data"
+        vault_path = os.path.join(vault_dir, ".auth_vault.json")
+        if not os.path.exists(vault_path):
+            return None
+        try:
+            with open(vault_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            raw_pass = base64.b64decode(data.get("p_token", "")).decode("utf-8")
+            return {
+                "username": data.get("username", ""),
+                "password": raw_pass,
+                "type": data.get("type", 0),
+            }
+        except Exception:
+            return None
+
+    def ensure_authenticated(self) -> bool:
+        """
+        Verify if current session is active.
+        If expired or unauthenticated, silently auto-login using saved vault credentials.
+        Returns True if authenticated.
+        """
+        if self.token and self.session_data:
+            expire_str = self.session_data.get("Expire")
+            if expire_str:
+                try:
+                    expire_dt = datetime.fromisoformat(expire_str.replace("Z", "+00:00"))
+                    now = datetime.now(timezone.utc)
+                    if expire_dt.tzinfo is None:
+                        expire_dt = expire_dt.replace(tzinfo=timezone.utc)
+                    if now < expire_dt:
+                        return True
+                except Exception:
+                    pass
+            else:
+                return True
+
+        # Token is expired or missing. Auto-renew silently!
+        vault = self.load_vault()
+        if vault and vault.get("username") and vault.get("password"):
+            try:
+                self.login(vault["username"], vault["password"], vault.get("type", 0))
+                return True
+            except Exception as e:
+                print(f"[HCMUTEClient] Silent auto-renew session failed: {e}")
+        return False
+
     def logout(self) -> None:
-        """Clear local session."""
+        """Clear local session and vault."""
         self.session_data = None
         self.token = None
         if os.path.exists(self.token_cache_file):
             try:
                 os.remove(self.token_cache_file)
+            except OSError:
+                pass
+        vault_dir = os.path.dirname(self.token_cache_file) or "data"
+        vault_path = os.path.join(vault_dir, ".auth_vault.json")
+        if os.path.exists(vault_path):
+            try:
+                os.remove(vault_path)
             except OSError:
                 pass
 
@@ -112,6 +187,7 @@ class HCMUTEClient:
             raise ValueError(f"Dữ liệu phản hồi đăng nhập không hợp lệ: {data}")
 
         self.save_session(data)
+        self.save_vault(username, password, account_type)
         return data
 
     def is_authenticated(self) -> bool:

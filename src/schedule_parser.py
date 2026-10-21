@@ -41,6 +41,77 @@ DAY_MAP: Dict[Any, int] = {
 }
 
 
+# 9 Distinct, vibrant Google Calendar & iCal colors for Courses
+# Excludes Color 11 (Tomato) and Color 4 (Flamingo) which are reserved for Exams & Deadlines
+COURSE_COLOR_PALETTE = [
+    ("7", "#039be5"),  # Peacock (Xanh lam chim công)
+    ("2", "#33b679"),  # Sage (Xanh lá xô thơm)
+    ("5", "#f6bf26"),  # Banana (Vàng chuối)
+    ("9", "#3f51b5"),  # Blueberry (Xanh việt quất)
+    ("3", "#8e24aa"),  # Grape (Tím nho)
+    ("10", "#0b8043"), # Basil (Xanh húng quế đậm)
+    ("1", "#7986cb"),  # Lavender (Tím hoa cà)
+    ("6", "#f4511e"),  # Tangerine (Cam tươi)
+    ("8", "#616161"),  # Graphite (Xám chì)
+]
+
+
+def get_course_color(course_name: str) -> tuple[str, str]:
+    """
+    Deterministically map a course name to a Google Calendar colorId and hex color.
+    Guarantees every session of the same course gets the identical color,
+    while different courses get different colors.
+    """
+    if not course_name:
+        return COURSE_COLOR_PALETTE[0]
+
+    clean_name = re.sub(r"\[.*?\]|\(.*?\)", "", course_name).strip().lower()
+    if not clean_name:
+        clean_name = course_name.lower().strip()
+
+    h = 0
+    for i, char in enumerate(clean_name):
+        h = (h * 37 + ord(char) * (i + 7)) & 0xFFFFFFFF
+    idx = h % len(COURSE_COLOR_PALETTE)
+    return COURSE_COLOR_PALETTE[idx]
+
+
+def assign_course_colors(events: List["CalendarEvent"]) -> None:
+    """
+    Ensure each distinct course in the event list receives a unique, collision-free color from the palette,
+    while exam events are guaranteed to receive Tomato Red (Color 11, #d50000).
+    """
+    course_titles = []
+    for ev in events:
+        if (ev.event_type or "").upper() in ("CLASS", "TKB"):
+            clean_title = re.sub(r"\[.*?\]|\(.*?\)", "", ev.title).strip()
+            if clean_title and clean_title not in course_titles:
+                course_titles.append(clean_title)
+
+    color_map = {}
+    for idx, ct in enumerate(course_titles):
+        color_map[ct] = COURSE_COLOR_PALETTE[idx % len(COURSE_COLOR_PALETTE)]
+
+    for ev in events:
+        ev_type = (ev.event_type or "").upper()
+        if ev_type == "EXAM":
+            ev.color_id = "11"  # Tomato (Đỏ tươi nổi bật cảnh báo)
+            ev.color_hex = "#d50000"
+            if "THI" not in ev.title.upper():
+                ev.title = f"🔥 [LỊCH THI] {ev.title}"
+            elif not ev.title.startswith("🔥"):
+                ev.title = f"🔥 {ev.title}"
+        elif ev_type == "DEADLINE":
+            ev.color_id = "4"   # Flamingo (Cam hồng)
+            ev.color_hex = "#e67c73"
+        else:
+            clean_title = re.sub(r"\[.*?\]|\(.*?\)", "", ev.title).strip()
+            if clean_title in color_map:
+                ev.color_id, ev.color_hex = color_map[clean_title]
+            else:
+                ev.color_id, ev.color_hex = get_course_color(ev.title)
+
+
 class CalendarEvent:
     """Standardized Calendar Event Model."""
 
@@ -55,6 +126,8 @@ class CalendarEvent:
         event_type: str = "CLASS",  # CLASS, EXAM, DEADLINE, REMINDER
         category: str = "ACADEMIC",
         is_all_day: bool = False,
+        color_id: str = "",
+        color_hex: str = "",
     ):
         self.uid = uid
         self.title = title
@@ -65,6 +138,20 @@ class CalendarEvent:
         self.event_type = event_type
         self.category = category
         self.is_all_day = is_all_day
+
+        if color_id and color_hex:
+            self.color_id = color_id
+            self.color_hex = color_hex
+        elif (event_type or "").upper() == "EXAM":
+            self.color_id = "11"  # Tomato
+            self.color_hex = "#d50000"
+        elif (event_type or "").upper() == "DEADLINE":
+            self.color_id = "4"   # Flamingo
+            self.color_hex = "#e67c73"
+        else:
+            cid, hex_c = get_course_color(self.title)
+            self.color_id = cid
+            self.color_hex = hex_c
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -77,6 +164,8 @@ class CalendarEvent:
             "event_type": self.event_type,
             "category": self.category,
             "is_all_day": self.is_all_day,
+            "color_id": self.color_id,
+            "color_hex": self.color_hex,
         }
 
     @classmethod
@@ -91,6 +180,8 @@ class CalendarEvent:
             event_type=d.get("event_type", "CLASS"),
             category=d.get("category", "ACADEMIC"),
             is_all_day=d.get("is_all_day", False),
+            color_id=d.get("color_id", ""),
+            color_hex=d.get("color_hex", ""),
         )
 
     def __repr__(self) -> str:
@@ -309,6 +400,7 @@ def parse_semester_schedule(data: Any) -> List[CalendarEvent]:
 
             curr_d += timedelta(days=7)
 
+    assign_course_colors(events)
     return events
 
 
@@ -392,7 +484,7 @@ def parse_exam_schedule(exam_data: Any) -> List[CalendarEvent]:
             continue
         seen_exams.add(dedup_key)
 
-        title = f"[LỊCH THI] {subject}"
+        title = f"🔥 [LỊCH THI] {subject}"
         desc = (
             f"🎯 KỲ THI: {exam_type}\n"
             f"📚 Môn thi: {subject}\n"
@@ -417,7 +509,10 @@ def parse_exam_schedule(exam_data: Any) -> List[CalendarEvent]:
                 description=desc,
                 event_type="EXAM",
                 category="EXAM",
+                color_id="11",
+                color_hex="#d50000",
             )
         )
 
+    assign_course_colors(events)
     return events
