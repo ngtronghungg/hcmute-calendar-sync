@@ -2193,27 +2193,29 @@
     }
 
     function showLogin() {
-      document.getElementById('loginView').classList.remove('hidden');
-      document.getElementById('dashboardView').classList.add('hidden');
-      document.getElementById('mainNav').classList.add('hidden');
-      document.getElementById('userPill').classList.add('hidden');
-      document.getElementById('logoutBtn').classList.add('hidden');
+      document.getElementById('loginView')?.classList.remove('hidden');
+      document.getElementById('dashboardView')?.classList.add('hidden');
+      document.getElementById('mainNav')?.classList.add('hidden');
+      document.getElementById('userPill')?.classList.add('hidden');
+      document.getElementById('logoutBtn')?.classList.add('hidden');
     }
 
     function showDashboard() {
-      document.getElementById('loginView').classList.add('hidden');
-      document.getElementById('dashboardView').classList.remove('hidden');
-      document.getElementById('mainNav').classList.remove('hidden');
-      document.getElementById('userPill').classList.remove('hidden');
-      document.getElementById('logoutBtn').classList.remove('hidden');
+      document.getElementById('loginView')?.classList.add('hidden');
+      document.getElementById('dashboardView')?.classList.remove('hidden');
+      document.getElementById('mainNav')?.classList.remove('hidden');
+      document.getElementById('userPill')?.classList.remove('hidden');
+      document.getElementById('logoutBtn')?.classList.remove('hidden');
 
       if (appState.profile) {
-        document.getElementById('userNameDisplay').textContent =
-          `${appState.profile.name} (${appState.profile.id})`;
+        const userDisplay = document.getElementById('userNameDisplay');
+        if (userDisplay) {
+          userDisplay.textContent = `${appState.profile.name || 'Sinh viên'} (${appState.profile.id || ''})`;
+        }
         const syncTitle = document.getElementById('syncUserFullTitle');
-        if (syncTitle) syncTitle.textContent = `${appState.profile.name}`;
+        if (syncTitle) syncTitle.textContent = `${appState.profile.name || 'Sinh viên'}`;
         const syncSub = document.getElementById('syncUserMssvSubtitle');
-        if (syncSub) syncSub.textContent = `MSSV: ${appState.profile.id} • ${appState.profile.status || 'Đang học'}`;
+        if (syncSub) syncSub.textContent = `MSSV: ${appState.profile.id || ''} • ${appState.profile.status || 'Đang học'}`;
       }
     }
 
@@ -2295,11 +2297,12 @@
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
-          await loadOverviewData();
-          // Load considerations in background without blocking
+          // Instant navigation: load overview & considerations in background
+          loadOverviewData().catch(err => console.warn('Overview load error:', err));
           loadConsiderations();
+          return;
         } else {
-          errorDiv.textContent = data.message || 'Đăng nhập không thành công.';
+          errorDiv.textContent = data.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại MSSV và Mật khẩu.';
           errorDiv.classList.remove('hidden');
         }
       } catch (err) {
@@ -2360,9 +2363,10 @@
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
-          await loadOverviewData();
-          // Load considerations in background without blocking
+          // Instant navigation: load overview & considerations in background
+          loadOverviewData().catch(err => console.warn('Overview load error:', err));
           loadConsiderations();
+          return;
         } else {
           errorDiv.textContent = data.message || 'Token không hợp lệ hoặc đã hết hạn.';
           errorDiv.classList.remove('hidden');
@@ -2556,9 +2560,6 @@
         if (!appState.classes || appState.classes.length === 0) {
           grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Không thể tải TKB: ${err.message}</div>`;
         }
-      }
-      } catch (err) {
-        grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Không thể tải TKB: ${err.message}</div>`;
       }
     }
 
