@@ -1028,119 +1028,6 @@
           </div>
 
         </div>
-
-        <!-- KHU VỰC QUẢN TRỊ ADMIN (QUẢN LÝ USER & BROADCAST) -->
-        <div class="card" style="padding: 24px; border-color: rgba(255, 255, 255, 0.12);">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--surface-border);">
-            <div>
-              <h3 style="font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
-                <span>👑 Bảng Quản trị Bot & Sinh viên</span>
-              </h3>
-              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
-                Dành cho Admin: Quản lý sinh viên kết nối, gửi thử bản tin sáng và phát thông báo chung.
-              </p>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <span class="priority-pill" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 12px; padding: 4px 12px;" id="tgAdminUserCountBadge">
-                👥 0 Sinh viên
-              </span>
-              <button class="btn-secondary" style="font-size: 12px; padding: 6px 12px; border-color: rgba(234, 179, 8, 0.4); color: #fde047;" onclick="triggerTestMorningPush()">
-                ☀️ Gửi thử Bản tin sáng
-              </button>
-              <button class="btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="loadTelegramAdminUsers()">
-                🔄 Tải lại
-              </button>
-            </div>
-          </div>
-
-          <!-- Bảng danh sách sinh viên -->
-          <div style="overflow-x: auto; margin-bottom: 24px;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
-              <thead>
-                <tr style="border-bottom: 1px solid var(--surface-border); color: var(--text-muted);">
-                  <th style="padding: 10px 14px;">MSSV / SĐT</th>
-                  <th style="padding: 10px 14px;">Họ và Tên</th>
-                  <th style="padding: 10px 14px;">Telegram Chat ID</th>
-                  <th style="padding: 10px 14px;">Username</th>
-                  <th style="padding: 10px 14px;">Ngày đăng ký</th>
-                  <th style="padding: 10px 14px; text-align: right;">Hành động</th>
-                </tr>
-              </thead>
-              <tbody id="tgAdminUsersTableBody">
-                <tr>
-                  <td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">
-                    Đang tải danh sách sinh viên...
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Gửi thông báo phát sóng (Broadcast) -->
-          <div style="padding: 18px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--surface-border); border-radius: var(--radius-md);">
-            <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">📢 Gửi thông báo tới toàn bộ sinh viên (Broadcast)</h4>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-              Tin nhắn này sẽ được gửi trực tiếp đến Telegram của tất cả sinh viên có tên trong danh sách trên.
-            </p>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <input type="text" id="tgBroadcastInput" class="input-control" placeholder="Nhập nội dung thông báo chung (VD: Lịch học tuần tới nghỉ lễ...)" style="flex: 1; min-width: 250px;">
-              <button class="btn-primary" style="width: auto; padding: 0 20px;" onclick="sendTelegramBroadcast()">
-                🚀 Phát thông báo
-              </button>
-            </div>
-          </div>
-
-          <!-- Cơ chế Báo nghỉ Zalo Cộng đồng (Crowdsource Auto-Confirm) -->
-          <div style="margin-top: 20px; padding: 18px; background: rgba(234, 179, 8, 0.05); border: 1px solid rgba(234, 179, 8, 0.25); border-radius: var(--radius-md);">
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
-              <h4 style="font-size: 14px; font-weight: 600; color: #fde047; display: flex; align-items: center; gap: 8px;">
-                <span>🗳️ Cơ chế Báo nghỉ Zalo Cộng đồng (Crowdsource Auto-Confirm)</span>
-              </h4>
-              <span class="priority-pill" style="background: rgba(234, 179, 8, 0.2); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.4); font-size: 11px;">
-                TỰ ĐỘNG BÁO CẢ LỚP
-              </span>
-            </div>
-            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
-              Khi giảng viên nhắn Zalo lớp báo nghỉ đột xuất mà cổng trường chưa cập nhật: Các sinh viên chỉ cần bấm <code>/nghi</code> trên Telegram hoặc Web. Khi đạt đủ tỉ lệ đồng thuận (mặc định <strong>80%</strong>), hệ thống sẽ <strong>tự động xóa buổi học khỏi Google Calendar cho cả lớp</strong> và gửi thông báo khẩn ngay lập tức!
-            </p>
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <label style="font-size: 12px; color: #fff;">Tỉ lệ kích hoạt:</label>
-                <input type="number" id="crowdThresholdInput" min="10" max="100" value="80" class="input-control" style="width: 75px; text-align: center; padding: 4px 8px; font-size: 13px;">
-                <span style="font-size: 13px; color: #fff; font-weight: 600;">%</span>
-              </div>
-              <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="saveCrowdsourceConfig()">
-                💾 Lưu thiết lập
-              </button>
-            </div>
-          </div>
-
-          <!-- Cấu hình Bot Token Admin (Thu gọn) -->
-          <details style="margin-top: 20px; font-size: 12px; color: var(--text-muted);">
-            <summary style="cursor: pointer; padding: 6px 0; color: var(--text-subtle);">
-              ⚙️ Cấu hình Bot Token của Admin (Bấm để xem/sửa)
-            </summary>
-            <div style="margin-top: 12px; padding: 14px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
-              <div class="form-group" style="margin-bottom: 10px;">
-                <label class="form-label">Telegram Bot Token (Từ @BotFather)</label>
-                <input type="text" id="tgAdminBotToken" class="input-control" placeholder="VD: 7123456789:AAH7xY...">
-              </div>
-              <div class="form-group" style="margin-bottom: 12px;">
-                <label class="form-label">Bot Username (Không có dấu @)</label>
-                <input type="text" id="tgAdminBotUsername" class="input-control" placeholder="VD: HCMUTESyncBot">
-              </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="saveAdminBotConfig()">
-                  💾 Lưu Token Admin
-                </button>
-                <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald);" onclick="enableTelegramWebhook()">
-                  ⚡ Bật Webhook (0% CPU, Giảm tải RAM ngầm)
-                </button>
-              </div>
-            </div>
-          </details>
-
-        </div>
       </section>
 
       <!-- TAB 5: SYNC & EXPORT -->
@@ -1253,6 +1140,16 @@
       </section>
 
     </div>
+
+    <!-- SUBTLE FOOTER -->
+    <footer style="margin-top: 48px; padding: 24px 0 16px; border-top: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-muted);">
+      <div>HCMUTE Calendar Sync — Cập nhật TKB, Lịch thi & Báo nghỉ tức thời</div>
+      <div>
+        <a href="/admin" target="_blank" style="color: var(--text-muted); text-decoration: none; opacity: 0.6; display: inline-flex; align-items: center; gap: 5px; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+          <span>🔒</span> <span>Trang Quản trị Hệ thống (Admin)</span>
+        </a>
+      </div>
+    </footer>
 
   </main>
 
@@ -1984,34 +1881,6 @@
       }
     }
 
-    async function loadCrowdsourceConfig() {
-      try {
-        const res = await fetch('/api/schedule/crowdsource/config');
-        const data = await res.json();
-        if (data.success && data.config) {
-          const inp = document.getElementById('crowdThresholdInput');
-          if (inp && data.config.threshold_percent) inp.value = data.config.threshold_percent;
-        }
-      } catch (e) {}
-    }
-
-    async function saveCrowdsourceConfig() {
-      const val = parseInt(document.getElementById('crowdThresholdInput')?.value || '80', 10);
-      try {
-        const res = await fetch('/api/schedule/crowdsource/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ threshold_percent: val, enabled: true })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showBanner(`✔ Đã lưu tỉ lệ kích hoạt Báo nghỉ Cộng đồng: ${val}%!`, 'success');
-        }
-      } catch (err) {
-        showBanner('Lỗi lưu: ' + err.message, 'error');
-      }
-    }
-
     async function promptAddMakeupClass() {
       const title = prompt("Nhập Tên môn học báo học bù:");
       if (!title) return;
@@ -2053,32 +1922,21 @@
 
     async function loadTelegramConfig() {
       try {
-        // 1. Fetch Bot Info
         const infoRes = await fetch('/api/telegram/bot-info');
         const infoData = await infoRes.json();
-        const botUsername = infoData.bot_username || 'BotFather';
+        const botUsername = infoData.bot_username || '';
         const mssv = appState.profile ? appState.profile.id : '';
 
         const directBtn = document.getElementById('tgDirectStartBtn');
         if (directBtn) {
-          if (infoData.bot_username) {
+          if (botUsername) {
             directBtn.href = `https://t.me/${botUsername}?start=${mssv}`;
-            directBtn.innerHTML = `<span>💬 Mở Bot @${botUsername} & Bấm Start</span>`;
+            directBtn.innerHTML = `<span>💬 Mở Telegram & Bấm Start</span>`;
           } else {
             directBtn.href = 'https://t.me/BotFather';
-            directBtn.innerHTML = `<span>⚠️ Admin chưa cấu hình Bot Username (Bấm xem mục Admin)</span>`;
+            directBtn.innerHTML = `<span>💬 Mở Telegram Kết nối</span>`;
           }
         }
-
-        const adminTokenInput = document.getElementById('tgAdminBotToken');
-        const adminUserInput = document.getElementById('tgAdminBotUsername');
-        if (adminUserInput) adminUserInput.value = botUsername;
-
-        // 2. Fetch Admin Users List
-        await loadTelegramAdminUsers();
-
-        // 3. Fetch Crowdsource Cancellation Config
-        await loadCrowdsourceConfig();
       } catch (err) {
         console.error('Error loading telegram config:', err);
       }
@@ -2103,159 +1961,11 @@
         const data = await res.json();
         if (data.success) {
           showBanner('🎉 Kết nối Telegram thành công! Bot đã gửi tin nhắn chào mừng đến Telegram của bạn.', 'success');
-          await loadTelegramAdminUsers();
         } else {
           showBanner('Lỗi: ' + data.message, 'error');
         }
       } catch (err) {
         showBanner('Lỗi kết nối máy chủ: ' + err.message, 'error');
-      }
-    }
-
-    async function loadTelegramAdminUsers() {
-      const tbody = document.getElementById('tgAdminUsersTableBody');
-      const badge = document.getElementById('tgAdminUserCountBadge');
-
-      try {
-        const res = await fetch('/api/telegram/users');
-        const data = await res.json();
-        if (!data.success) return;
-
-        const users = data.users || [];
-        if (badge) badge.textContent = `👥 ${users.length} Sinh viên`;
-
-        if (!tbody) return;
-        if (users.length === 0) {
-          tbody.innerHTML = `
-            <tr>
-              <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
-                Chưa có sinh viên nào liên kết Bot Telegram. Khi có người bấm /start hoặc nhập Chat ID, thông tin sẽ hiện ở đây.
-              </td>
-            </tr>
-          `;
-          return;
-        }
-
-        tbody.innerHTML = users.map(u => `
-          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <td style="padding: 10px 14px; font-weight: 600; color: var(--accent-blue);">${u.mssv || '—'}</td>
-            <td style="padding: 10px 14px; font-weight: 500;">${u.name || 'Sinh viên'}</td>
-            <td style="padding: 10px 14px; font-family: var(--font-mono); font-size: 12px;">${u.chat_id}</td>
-            <td style="padding: 10px 14px; color: var(--text-muted);">${u.username ? '@' + u.username : '—'}</td>
-            <td style="padding: 10px 14px; color: var(--text-muted); font-size: 11px;">${u.registered_at || '—'}</td>
-            <td style="padding: 10px 14px; text-align: right;">
-              <button class="btn-secondary" style="font-size: 11px; padding: 3px 8px; color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);" onclick="deleteAdminUser('${u.chat_id}')">
-                🗑️ Xóa
-              </button>
-            </td>
-          </tr>
-        `).join('');
-
-      } catch (err) {
-        if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-red); padding: 16px;">Lỗi tải danh sách: ${err.message}</td></tr>`;
-      }
-    }
-
-    async function triggerTestMorningPush() {
-      if (!confirm('Gửi thử ngay Bản tin sáng hôm nay tới tất cả sinh viên đang kết nối bot?')) return;
-      showBanner('Đang gửi thử Bản tin sáng tới các thiết bị sinh viên...', 'success');
-      try {
-        const res = await fetch('/api/telegram/test-push', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          const r = data.result || {};
-          showBanner(`🎉 Đã gửi thành công Bản tin sáng tới ${r.sent}/${r.total} sinh viên!`, 'success');
-        } else {
-          showBanner('Lỗi gửi thử: ' + (data.message || data.result?.message || 'Không thành công'), 'error');
-        }
-      } catch (err) {
-        showBanner('Lỗi kết nối: ' + err.message, 'error');
-      }
-    }
-
-    async function sendTelegramBroadcast() {
-      const input = document.getElementById('tgBroadcastInput');
-      const msg = input ? input.value.trim() : '';
-      if (!msg) {
-        showBanner('⚠️ Vui lòng nhập nội dung cần phát thông báo!', 'error');
-        return;
-      }
-
-      if (!confirm('Bạn có chắc chắn muốn gửi tin nhắn này đến TẤT CẢ sinh viên đã đăng ký?')) {
-        return;
-      }
-
-      showBanner('Đang phát thông báo tới tất cả sinh viên...', 'success');
-      try {
-        const res = await fetch('/api/telegram/broadcast', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: msg })
-        });
-        const data = await res.json();
-        if (data.success) {
-          const r = data.result || {};
-          showBanner(`🎉 Đã phát thông báo thành công đến ${r.sent}/${r.total} sinh viên!`, 'success');
-          if (input) input.value = '';
-        } else {
-          showBanner('Lỗi phát thông báo: ' + data.message, 'error');
-        }
-      } catch (err) {
-        showBanner('Lỗi kết nối: ' + err.message, 'error');
-      }
-    }
-
-    async function deleteAdminUser(chatId) {
-      if (!confirm(`Bạn có chắc muốn xóa sinh viên có Chat ID ${chatId}?`)) return;
-
-      try {
-        const res = await fetch('/api/telegram/delete-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: chatId })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showBanner('✔ Đã xóa sinh viên khỏi danh sách Bot.', 'success');
-          await loadTelegramAdminUsers();
-        }
-      } catch (err) {
-        showBanner('Lỗi: ' + err.message, 'error');
-      }
-    }
-
-    async function saveAdminBotConfig() {
-      const token = document.getElementById('tgAdminBotToken')?.value.trim() || '';
-      const username = document.getElementById('tgAdminBotUsername')?.value.trim().replace('@', '') || '';
-
-      try {
-        const res = await fetch('/api/telegram/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bot_token: token, bot_username: username, enabled: true })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showBanner('✔ Đã lưu cấu hình Bot Admin! Sinh viên giờ đây có thể bấm Start để kết nối.', 'success');
-          await loadTelegramConfig();
-        }
-      } catch (err) {
-        showBanner('Lỗi lưu cấu hình: ' + err.message, 'error');
-      }
-    }
-
-    async function enableTelegramWebhook() {
-      showBanner('Đang kết nối Webhook với máy chủ Telegram...', 'success');
-      try {
-        const res = await fetch('/api/telegram/set-webhook', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          showBanner(data.message, 'success');
-        } else {
-          showBanner('Không thể bật Webhook: ' + data.message, 'error');
-        }
-      } catch (err) {
-        showBanner('Lỗi kết nối: ' + err.message, 'error');
       }
     }
 

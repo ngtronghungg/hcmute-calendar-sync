@@ -134,6 +134,31 @@ def index():
     return send_from_directory(WEB_DIR, "index.html")
 
 
+@app.route("/admin")
+def admin_page():
+    return send_from_directory(WEB_DIR, "admin.html")
+
+
+def check_admin_auth() -> bool:
+    """Validate admin authorization via X-Admin-Key header, query param, or json body."""
+    admin_pass = os.environ.get("ADMIN_PASSCODE") or load_config().get("admin_passcode", "admin123")
+    if not admin_pass:
+        return True
+    key = request.headers.get("X-Admin-Key") or request.args.get("admin_key")
+    if not key and request.is_json and request.json:
+        key = request.json.get("key") or request.json.get("admin_key")
+    return str(key or "").strip() == str(admin_pass).strip()
+
+
+@app.route("/api/admin/verify", methods=["POST"])
+def api_admin_verify():
+    """Verify admin passcode from frontend."""
+    if check_admin_auth():
+        return jsonify({"success": True, "message": "Xác thực thành công"})
+    return jsonify({"success": False, "message": "Mật khẩu quản trị không chính xác."}), 403
+
+
+
 @app.route("/api/status", methods=["GET"])
 def api_status():
     """Return login state and student profile, auto-renewing session silently if vault credentials exist."""
@@ -1062,6 +1087,8 @@ def api_telegram_config():
     """Get or save Telegram Bot settings."""
     cfg = load_config()
     if request.method == "POST":
+        if not check_admin_auth():
+            return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
         data = request.json or {}
         if "telegram" not in cfg:
             cfg["telegram"] = {}
@@ -1106,6 +1133,8 @@ def api_telegram_bot_info():
 @app.route("/api/telegram/users", methods=["GET"])
 def api_telegram_users():
     """Admin endpoint: Get all registered telegram users and stats."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
     from src.telegram_bot import load_telegram_users
     users = load_telegram_users()
     return jsonify({
@@ -1158,6 +1187,8 @@ def api_telegram_register():
 @app.route("/api/telegram/broadcast", methods=["POST"])
 def api_telegram_broadcast():
     """Admin endpoint: Broadcast announcement to all registered students."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
     from src.telegram_bot import broadcast_telegram_message
     cfg = load_config().get("telegram", {})
     bot_token = cfg.get("bot_token", "").strip()
@@ -1176,6 +1207,8 @@ def api_telegram_broadcast():
 @app.route("/api/telegram/delete-user", methods=["POST"])
 def api_telegram_delete_user():
     """Admin endpoint: Delete a registered student."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
     from src.telegram_bot import delete_telegram_user
     data = request.json or {}
     chat_id = str(data.get("chat_id", "")).strip()
@@ -1188,6 +1221,8 @@ def api_telegram_delete_user():
 @app.route("/api/telegram/test-push", methods=["POST"])
 def api_telegram_test_push():
     """Admin endpoint: Send test morning briefing to all registered students right now."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
     from src.telegram_bot import trigger_morning_briefing
     client = get_client()
     res = trigger_morning_briefing(client)
@@ -1219,6 +1254,8 @@ def api_telegram_webhook():
 @app.route("/api/telegram/set-webhook", methods=["POST"])
 def api_telegram_set_webhook():
     """Register webhook with Telegram API to eliminate continuous background loops."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
     cfg = load_config().get("telegram", {})
     bot_token = cfg.get("bot_token", "").strip()
     if not bot_token:
@@ -1321,6 +1358,8 @@ def api_schedule_crowdsource_config():
         }
 
     if request.method == "POST":
+        if not check_admin_auth():
+            return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
         data = request.json or {}
         if "enabled" in data:
             cfg["crowdsource_cancellation"]["enabled"] = bool(data["enabled"])
@@ -1356,6 +1395,8 @@ def api_schedule_makeup():
         return jsonify({"success": True, "items": [e.to_dict() for e in events]})
 
     if request.method == "POST":
+        if not check_admin_auth():
+            return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
         data = request.json or {}
         title = data.get("title", "").strip()
         date_str = data.get("date", "").strip()
