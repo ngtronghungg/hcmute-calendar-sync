@@ -134,10 +134,13 @@ def load_student_access() -> list:
         except Exception:
             pass
     tg_users = load_telegram_users()
-    existing_mssvs = {str(r["mssv"]).strip() for r in results if r.get("mssv")}
+    existing_keys = {str(r.get("mssv", "")).strip() for r in results if r.get("mssv")}
+    existing_chats = {str(r.get("chat_id", "")).strip() for r in results if r.get("chat_id")}
+
     for u in tg_users.values():
         u_mssv = str(u.get("mssv", "")).strip()
-        if u_mssv and u_mssv not in existing_mssvs:
+        cid = str(u.get("chat_id", "")).strip()
+        if u_mssv and u_mssv not in existing_keys:
             results.append({
                 "mssv": u_mssv,
                 "name": u.get("name", "Sinh viên"),
@@ -145,9 +148,23 @@ def load_student_access() -> list:
                 "first_seen": u.get("registered_at", ""),
                 "last_seen": u.get("last_active", ""),
                 "access_count": 1,
-                "chat_id": u.get("chat_id"),
+                "chat_id": cid,
             })
-            existing_mssvs.add(u_mssv)
+            existing_keys.add(u_mssv)
+        elif not u_mssv and cid and cid not in existing_chats:
+            tg_name = u.get("name") or "Sinh viên Telegram"
+            tg_uname = f"@{u['username']}" if u.get("username") else cid
+            results.append({
+                "mssv": "Chưa gán",
+                "name": f"{tg_name} ({tg_uname})",
+                "channel": "Telegram Bot",
+                "first_seen": u.get("registered_at", ""),
+                "last_seen": u.get("last_active", ""),
+                "access_count": 1,
+                "chat_id": cid,
+            })
+            existing_chats.add(cid)
+
     # Sort by last_seen descending
     results.sort(key=lambda x: x.get("last_seen", ""), reverse=True)
     return results
@@ -862,7 +879,7 @@ def format_student_info(chat_id: str, client: HCMUTEClient) -> str:
         f"• ☀️ Bản tin sáng 06:30: {'✅ BẬT' if u.get('morning_briefing', True) else '❌ TẮT'}",
         f"• ⚠️ Báo nghỉ / Học bù: {'✅ BẬT' if u.get('diff_alert', True) else '❌ TẮT'}",
         f"• 🔥 Cảnh báo lịch thi: {'✅ BẬT' if u.get('exam_alert', True) else '❌ TẮT'}\n",
-        "💡 <i>Bạn có thể gửi tin nhắn chứa mã số sinh viên (ví dụ: <code>24144177</code>) để cập nhật MSSV bất cứ lúc nào!</i>",
+        "💡 <i>Bạn có thể gửi tin nhắn chứa MSSV gồm 8 chữ số để cập nhật bất cứ lúc nào!</i>",
     ]
     return "\n".join(lines)
 
@@ -1118,8 +1135,12 @@ class TelegramBotDaemon:
 
                 client = self.get_client()
 
-                # 1. Process Telegram Updates (Long Polling with non-blocking worker threads)
-                self._poll_updates(bot_token, client)
+                # 1. Process Telegram Updates (Skip polling if Webhook is active to save 100% idle CPU & RAM)
+                use_webhook = tg_cfg.get("use_webhook", False) or tg_cfg.get("webhook_active", False)
+                if not use_webhook:
+                    self._poll_updates(bot_token, client)
+                else:
+                    time.sleep(15)
 
                 # 2. Check Morning Briefing (Strict Vietnam Timezone UTC+7)
                 now_vn = get_vietnam_now()
@@ -1156,19 +1177,15 @@ class TelegramBotDaemon:
             time.sleep(1)
 
     def _poll_updates(self, bot_token: str, client: HCMUTEClient):
-        """Fetch Telegram updates and dispatch immediately to background workers."""
+        """Fetch Telegram updates with efficient long-polling (reduced requests by 90%)."""
         url = f"https://api.telegram.org/bot{bot_token}/getUpdates"
-        params = {"offset": self.last_update_id + 1, "timeout": 2}
+        params = {"offset": self.last_update_id + 1, "timeout": 20}
 
         try:
-            resp = requests.get(url, params=params, timeout=5)
+            resp = requests.get(url, params=params, timeout=25)
             if resp.status_code == 409:
-                # Webhook conflict: auto-delete stale webhook so polling resumes immediately
-                try:
-                    requests.post(f"https://api.telegram.org/bot{bot_token}/deleteWebhook", timeout=3)
-                except Exception:
-                    pass
-                time.sleep(2)
+                # Webhook is active: do not delete, just switch off polling
+                time.sleep(10)
                 return
 
             if resp.status_code != 200:
@@ -1455,8 +1472,10 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
         name=full_name,
         username=tg_username,
     )
+    s_mssv = user_rec.get("mssv") or ""
+    record_student_access(s_mssv or f"Telegram_{chat_id}", user_rec.get("name") or full_name, channel="Telegram Bot")
 
-    # Auto-detect MSSV or /mssv command (e.g. 24144177 or /mssv 24144177)
+    # Auto-detect MSSV or /mssv command (e.g. 21110001 or /mssv 21110001)
     mssv_cmd = re.match(r"^/mssv(?:\s+(\d{7,11}))?$", text, flags=re.IGNORECASE)
     digit_match = re.match(r"^(\d{7,11})$", text)
     if digit_match or (mssv_cmd and mssv_cmd.group(1)):

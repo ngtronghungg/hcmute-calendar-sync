@@ -1035,7 +1035,7 @@
         <form id="formLoginPass" onsubmit="handleLogin(event)">
           <div class="form-group">
             <label class="form-label">Mã số sinh viên</label>
-            <input type="text" id="mssvInput" class="input-control" placeholder="24144177" required autocomplete="username">
+            <input type="text" id="mssvInput" class="input-control" placeholder="Nhập MSSV gồm 8 chữ số..." required autocomplete="username">
           </div>
           <div class="form-group">
             <label class="form-label">Mật khẩu portal</label>
@@ -1050,7 +1050,7 @@
         <form id="formLoginToken" class="hidden" onsubmit="handleTokenLogin(event)">
           <div class="form-group">
             <label class="form-label">MSSV (Tùy chọn)</label>
-            <input type="text" id="tokenMssvInput" class="input-control" placeholder="24144177">
+            <input type="text" id="tokenMssvInput" class="input-control" placeholder="Nhập MSSV gồm 8 chữ số...">
           </div>
           <div class="form-group">
             <label class="form-label">Bearer Token</label>
@@ -1192,7 +1192,7 @@
           </div>
 
           <div style="max-width: 360px; margin: 0 auto 24px; display: flex; gap: 8px;">
-            <input type="text" id="tgStudentChatId" class="input-control" placeholder="Hoặc nhập Chat ID / SĐT..." style="font-size: 13px;">
+            <input type="text" id="tgStudentChatId" class="input-control" placeholder="Hoặc nhập Chat ID Telegram..." style="font-size: 13px;">
             <button class="btn-secondary" style="padding: 0 16px; white-space: nowrap; font-size: 13px;" onclick="registerStudentChatId()">
               Kết nối
             </button>
@@ -1388,7 +1388,14 @@
     async function checkAuthStatus() {
       try {
         const res = await fetch('/api/status');
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
         if (data.authenticated) {
           appState.authenticated = true;
           appState.profile = data.profile;
@@ -1441,7 +1448,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: mssv, password: pass })
         });
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
 
         if (data.success) {
           appState.authenticated = true;
@@ -1510,7 +1524,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token: token, username: mssv })
         });
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
         if (data.success) {
           appState.authenticated = true;
           appState.profile = data.profile;
@@ -1602,7 +1623,14 @@
         const url = `/api/overview?year=${encodeURIComponent(yearVal)}&term=${encodeURIComponent(termVal)}&include_past=${includePast}&include_past_exams=${includePastExams}`;
 
         const res = await fetch(url);
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
         if (!data.success) throw new Error(data.message);
 
         appState.classes = data.classes || [];
@@ -1810,7 +1838,14 @@
 
       try {
         const res = await fetch('/api/considerations' + (force ? '?force=1' : ''));
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
         if (!data.success) throw new Error(data.message);
 
         appState.considerations = data.items || [];
@@ -1891,7 +1926,14 @@
 
       try {
         const res = await fetch(`/api/notice-detail?id=${encodeURIComponent(id)}&type=${encodeURIComponent(type)}`);
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
         if (!data.success) throw new Error(data.message);
 
         titleEl.textContent = data.subject || 'Chi tiết thông báo';
@@ -2074,7 +2116,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ uid: uid })
         });
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
         if (data.success) {
           if (shouldCancel && data.vote_result) {
             const vr = data.vote_result;
@@ -2108,7 +2157,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, date: dateStr, start_time: timeStr, location })
         });
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
         if (!data.success) throw new Error(data.message);
         showBanner(`✔ Đã thêm buổi học bù môn ${title} vào ngày ${dateStr}! Lịch Google Calendar đã tự động cập nhật.`, 'success');
         await loadOverviewData(true);
@@ -2157,7 +2213,13 @@
     async function registerStudentChatId() {
       const chatId = document.getElementById('tgStudentChatId')?.value.trim();
       if (!chatId) {
-        showBanner('⚠️ Vui lòng nhập Telegram Chat ID hoặc Số điện thoại!', 'error');
+        showBanner('Vui lòng nhập Telegram Chat ID!', 'error');
+        return;
+      }
+
+      // Check if user entered phone number
+      if (chatId.startsWith('+') || /^0\d{8,11}$/.test(chatId)) {
+        showBanner('Telegram không thể gửi tin nhắn qua SĐT. Bạn chỉ cần bấm nút "Mở Telegram & Bấm Start" phía trên là kết nối thành công ngay nhé!', 'error');
         return;
       }
 
@@ -2170,14 +2232,22 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chat_id: chatId, mssv: mssv, name: name })
         });
-        const data = await res.json();
+        
+        let data;
+        try {
+          data = await res.json();
+        } catch(e) {
+          showBanner('Máy chủ đang cập nhật bản mới. Bạn hãy thử lại sau giây lát nhé.', 'error');
+          return;
+        }
+
         if (data.success) {
           showBanner('🎉 Kết nối Telegram thành công! Bot đã gửi tin nhắn chào mừng đến Telegram của bạn.', 'success');
         } else {
-          showBanner('Lỗi: ' + data.message, 'error');
+          showBanner('Lỗi: ' + (data.message || 'Không thể kết nối'), 'error');
         }
       } catch (err) {
-        showBanner('Lỗi kết nối máy chủ: ' + err.message, 'error');
+        showBanner('Máy chủ đang cập nhật. Bạn hãy thử lại sau ít giây nhé.', 'error');
       }
     }
 

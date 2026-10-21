@@ -74,12 +74,12 @@ bot_daemon.start()
 
 @app.route("/")
 def index():
-    return send_from_directory(WEB_DIR, "index.html")
+    return send_from_directory(WEB_DIR, "index.html", max_age=3600)
 
 
 @app.route("/admin")
 def admin_page():
-    return send_from_directory(WEB_DIR, "admin.html")
+    return send_from_directory(WEB_DIR, "admin.html", max_age=3600)
 
 
 def check_admin_auth() -> bool:
@@ -108,6 +108,10 @@ def api_status():
     client = get_client()
     if client.ensure_authenticated():
         profile = client.get_user_profile() or {}
+        s_id = str(profile.get("Id", "")).strip()
+        s_name = profile.get("FullName") or profile.get("Username", "Sinh viên")
+        if s_id:
+            record_student_access(s_id, s_name, channel="Web Portal")
         return jsonify({
             "authenticated": True,
             "profile": {

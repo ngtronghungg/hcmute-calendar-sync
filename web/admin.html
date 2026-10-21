@@ -552,9 +552,12 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <h3 class="card-title">
-              <span>👥 Nhật ký MSSV đã truy cập</span>
-            </h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h3 class="card-title" style="margin-bottom: 0;">
+                <span>👥 Nhật ký MSSV đã truy cập</span>
+              </h3>
+              <span class="badge badge-success" style="font-size: 10px; padding: 2px 8px;">● Trực tiếp (6s)</span>
+            </div>
             <p class="card-subtitle">
               Danh sách sinh viên đã truy cập qua Web Portal hoặc Telegram Bot
             </p>
@@ -759,13 +762,22 @@
       }
     }
 
+    let livePollInterval = null;
+
     function revealDashboard() {
       document.getElementById('authOverlay').classList.add('hidden');
       document.getElementById('adminPortal').classList.remove('hidden');
       loadAllDashboardData();
+      if (!livePollInterval) {
+        livePollInterval = setInterval(loadAdminUsers, 6000); // Tự cập nhật danh sách mỗi 6s
+      }
     }
 
     function logoutAdmin() {
+      if (livePollInterval) {
+        clearInterval(livePollInterval);
+        livePollInterval = null;
+      }
       localStorage.removeItem('hcmute_admin_key');
       adminPasscode = '';
       document.getElementById('adminPortal').classList.add('hidden');
