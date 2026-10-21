@@ -352,6 +352,8 @@ def load_config() -> dict:
                     cfg["admin_passcode"] = secrets["admin_passcode"]
                 if secrets.get("gemini_api_key"):
                     cfg["gemini_api_key"] = secrets["gemini_api_key"]
+                if secrets.get("groq_api_key"):
+                    cfg["groq_api_key"] = secrets["groq_api_key"]
         except Exception:
             pass
 
@@ -368,6 +370,10 @@ def load_config() -> dict:
     env_admin = os.environ.get("ADMIN_PASSCODE")
     if env_admin:
         cfg["admin_passcode"] = env_admin.strip()
+
+    env_groq = os.environ.get("GROQ_API_KEY")
+    if env_groq:
+        cfg["groq_api_key"] = env_groq.strip()
 
     env_gemini = os.environ.get("GEMINI_API_KEY")
     if env_gemini:
@@ -386,6 +392,8 @@ def save_config(cfg: dict) -> bool:
             secrets["bot_username"] = cfg["telegram"]["bot_username"]
         if cfg.get("admin_passcode"):
             secrets["admin_passcode"] = cfg["admin_passcode"]
+        if cfg.get("groq_api_key"):
+            secrets["groq_api_key"] = cfg["groq_api_key"]
         if cfg.get("gemini_api_key"):
             secrets["gemini_api_key"] = cfg["gemini_api_key"]
 
@@ -401,6 +409,8 @@ def save_config(cfg: dict) -> bool:
             clean_cfg["telegram"]["bot_token"] = ""
         if clean_cfg.get("admin_passcode"):
             clean_cfg["admin_passcode"] = ""
+        if clean_cfg.get("groq_api_key"):
+            clean_cfg["groq_api_key"] = ""
         if clean_cfg.get("gemini_api_key"):
             clean_cfg["gemini_api_key"] = ""
 
@@ -1594,6 +1604,7 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
             votes_db = load_cancellation_votes()
             s_name, s_mssv = get_student_identity(chat_id, client)
             cfg = load_config()
+            groq_key = cfg.get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
             gemini_key = cfg.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY", "")
 
             reply_text, custom_markup = generate_conversational_reply(
@@ -1605,6 +1616,7 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
                 all_events=all_events,
                 cancelled_set=cancelled_set,
                 votes_db=votes_db,
+                groq_key=groq_key,
                 gemini_key=gemini_key,
             )
             send_telegram_message(bot_token, chat_id, reply_text, reply_markup=custom_markup or MAIN_INLINE_KEYBOARD)

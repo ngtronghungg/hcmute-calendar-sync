@@ -180,12 +180,93 @@ bot_daemon.start()
 
 @app.after_request
 def add_cache_headers(response):
-    """Enforce strict no-cache headers on dynamic pages and APIs to guarantee immediate session revocation."""
+    """Enforce strict no-cache headers on dynamic pages and APIs, but cache static assets for 24h to reduce Render CPU & bandwidth."""
     if request.path.startswith("/api/") or request.path in ["/", "/admin"]:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+    else:
+        # Cache static assets (CSS, JS, fonts, images) for 24 hours
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=86400"
     return response
+
+
+@app.route("/health", methods=["GET", "HEAD"])
+def health_check():
+    """
+    Lightweight health check endpoint for Render, UptimeRobot, and Keep-Alive daemon.
+    Consumes < 1ms CPU, 0 disk I/O, keeps free instance awake 24/7 within 750 free hours.
+    """
+    return jsonify({
+        "status": "healthy",
+        "service": "UTE_Cal",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "active_sessions": len(ACTIVE_SESSIONS)
+    })
+
+
+# ---------------------------------------------------------------------------
+# Background Keep-Alive Daemon (Bypasses Render 15-min free spin-down)
+# ---------------------------------------------------------------------------
+import threading
+import urllib.request
+
+_keep_alive_thread: Optional[threading.Thread] = None
+_keep_alive_stop_event = threading.Event()
+
+
+def keep_alive_worker(target_url: str, interval_sec: int = 600):
+    """
+    Background worker that pings target_url/health every 10 minutes (600s).
+    Touches Render's public router from external traffic, resetting the 15-minute inactivity timer.
+    Uses 0 cost (744h <= 750h free tier quota).
+    """
+    health_url = target_url.rstrip("/") + "/health"
+    print(f"[Keep-Alive] 🚀 Khởi chạy daemon ping {health_url} mỗi {interval_sec}s để chống ngủ đông Render.")
+
+    # Wait 45s on boot before first ping to allow server startup to stabilize
+    if _keep_alive_stop_event.wait(45):
+        return
+
+    while not _keep_alive_stop_event.is_set():
+        try:
+            req = urllib.request.Request(
+                health_url,
+                headers={"User-Agent": "UTE_Cal-KeepAlive/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as res:
+                if res.status == 200:
+                    pass
+        except Exception as e:
+            # Silent to avoid spamming logs
+            pass
+
+        if _keep_alive_stop_event.wait(interval_sec):
+            break
+
+
+def start_keep_alive_daemon():
+    """Start the keep alive background daemon if enabled or if running on Render."""
+    global _keep_alive_thread
+    if _keep_alive_thread and _keep_alive_thread.is_alive():
+        return
+
+    external_url = os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("KEEP_ALIVE_URL")
+    keep_alive_enabled = (
+        os.environ.get("KEEP_ALIVE_ENABLED", "").lower() in ("true", "1", "yes")
+        or bool(os.environ.get("RENDER_EXTERNAL_URL"))
+    )
+
+    if keep_alive_enabled and external_url:
+        _keep_alive_stop_event.clear()
+        _keep_alive_thread = threading.Thread(
+            target=keep_alive_worker,
+            args=(external_url, 600),
+            daemon=True,
+            name="KeepAliveDaemon"
+        )
+        _keep_alive_thread.start()
 
 
 @app.route("/")
@@ -251,6 +332,58 @@ def api_status():
             del ACTIVE_SESSIONS[token_key]
             save_sessions()
         return jsonify({"authenticated": False, "token_expired": True})
+
+
+@app.route("/api/ai/chat", methods=["POST"])
+def api_ai_chat():
+    """
+    Direct web chat endpoint for UTE_Cal assistant powered by Groq API.
+    Zero-knowledge session isolation, instant response (< 1s).
+    """
+    data = request.json or {}
+    user_msg = str(data.get("message") or "").strip()
+    if not user_msg:
+        return jsonify({"success": False, "message": "Tin nhắn không được để trống."}), 400
+
+    from src.conversational_ai import generate_conversational_reply
+    from src.telegram_bot import load_cancellations, load_cancellation_votes
+
+    session = get_request_session()
+    client = get_session_client(session) if session else None
+    student_name = session.get("name", "Bạn") if session else "Bạn"
+    student_mssv = str(session.get("mssv", "")).strip() if session else ""
+
+    all_events = []
+    if student_mssv:
+        try:
+            all_events = load_feed_cache(mssv=student_mssv) or []
+        except Exception:
+            all_events = []
+
+    cancelled_set = load_cancellations()
+    votes_db = load_cancellation_votes()
+
+    cfg = load_config()
+    groq_key = cfg.get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
+
+    try:
+        reply_text, _ = generate_conversational_reply(
+            text=user_msg,
+            chat_id=student_mssv or "web_user",
+            client=client,
+            student_name=student_name,
+            student_mssv=student_mssv,
+            all_events=all_events,
+            cancelled_set=cancelled_set,
+            votes_db=votes_db,
+            groq_key=groq_key,
+        )
+        return jsonify({"success": True, "reply": reply_text})
+    except Exception as e:
+        return jsonify({
+            "success": True,
+            "reply": f"🤖 <b>UTE_Cal:</b> Xin lỗi bạn, mình vừa gặp trục trặc tạm thời ({str(e)}). Vui lòng kiểm tra Groq API Key hoặc thử lại nhé!"
+        })
 
 
 @app.route("/api/login", methods=["POST"])
@@ -1449,15 +1582,19 @@ def api_telegram_config():
         cfg["telegram"]["morning_time"] = data.get("morning_time", "06:30").strip()
         cfg["telegram"]["diff_alert"] = bool(data.get("diff_alert", True))
         cfg["telegram"]["enabled"] = bool(data.get("enabled", True))
+        if "groq_api_key" in data:
+            cfg["groq_api_key"] = str(data.get("groq_api_key", "")).strip()
         if "gemini_api_key" in data:
             cfg["gemini_api_key"] = str(data.get("gemini_api_key", "")).strip()
 
         save_tg_config(cfg)
         ret_cfg = dict(cfg["telegram"])
+        ret_cfg["groq_api_key"] = cfg.get("groq_api_key", "")
         ret_cfg["gemini_api_key"] = cfg.get("gemini_api_key", "")
         return jsonify({"success": True, "config": ret_cfg})
 
     ret_cfg = dict(cfg.get("telegram", {}))
+    ret_cfg["groq_api_key"] = cfg.get("groq_api_key", "")
     ret_cfg["gemini_api_key"] = cfg.get("gemini_api_key", "")
     return jsonify({"success": True, "config": ret_cfg})
 
@@ -1850,127 +1987,6 @@ def api_schedule_makeup():
         return jsonify({"success": ok})
 
 
-# ==========================================
-# FEEDBACK & SUGGESTIONS WITH AI EVALUATION
-# ==========================================
-
-@app.route("/api/feedback/submit", methods=["POST"])
-def api_feedback_submit():
-    """Submit a new student suggestion/feedback and run real-time AI evaluation."""
-    session = get_request_session()
-    if not session:
-        return jsonify({"success": False, "message": "Vui lòng đăng nhập để gửi góp ý."}), 401
-
-    mssv = str(session.get("mssv", "")).strip()
-    name = session.get("name", "Sinh viên")
-
-    data = request.json or {}
-    category = data.get("category", "feature").strip()
-    title = data.get("title", "").strip()
-    content = data.get("content", "").strip()
-    is_anonymous = bool(data.get("is_anonymous", False))
-
-    if not title or not content:
-        return jsonify({"success": False, "message": "Vui lòng nhập đầy đủ tiêu đề và nội dung góp ý."}), 400
-
-    from src.feedback_manager import submit_feedback
-    try:
-        fb = submit_feedback(
-            mssv=mssv,
-            author_name=name,
-            category=category,
-            title=title,
-            content=content,
-            is_anonymous=is_anonymous,
-        )
-        return jsonify({"success": True, "feedback": fb})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 400
-
-
-@app.route("/api/feedback/my", methods=["GET"])
-def api_feedback_my():
-    """Return all feedback previously submitted by the current authenticated student."""
-    session = get_request_session()
-    if not session:
-        return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
-
-    mssv = str(session.get("mssv", "")).strip()
-    from src.feedback_manager import get_student_feedbacks
-    feedbacks = get_student_feedbacks(mssv)
-    return jsonify({"success": True, "feedbacks": feedbacks})
-
-
-@app.route("/api/admin/feedbacks", methods=["GET"])
-def api_admin_feedbacks():
-    """Admin endpoint: Get all feedbacks categorized across 10 levels with AI stats."""
-    if not check_admin_auth():
-        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
-
-    lvl_arg = request.args.get("level")
-    level_filter = int(lvl_arg) if lvl_arg and lvl_arg.isdigit() else None
-    status_filter = request.args.get("status")
-
-    from src.feedback_manager import get_admin_feedbacks_overview
-    res = get_admin_feedbacks_overview(level_filter=level_filter, status_filter=status_filter)
-    return jsonify({"success": True, "data": res})
-
-
-@app.route("/api/admin/feedback/status", methods=["POST"])
-def api_admin_feedback_status():
-    """Admin endpoint: Update review status and admin response note."""
-    if not check_admin_auth():
-        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
-
-    data = request.json or {}
-    fb_id = data.get("id", "").strip()
-    status = data.get("status", "reviewed").strip()
-    admin_note = data.get("admin_note", "").strip()
-
-    from src.feedback_manager import update_feedback_status
-    ok = update_feedback_status(fb_id, status=status, admin_note=admin_note)
-    return jsonify({"success": ok})
-
-
-@app.route("/api/admin/feedback/re-evaluate", methods=["POST"])
-def api_admin_feedback_re_evaluate():
-    """Admin endpoint: Trigger AI re-evaluation on a specific feedback."""
-    if not check_admin_auth():
-        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
-
-    data = request.json or {}
-    fb_id = data.get("id", "").strip()
-    from src.feedback_manager import re_evaluate_feedback
-    fb = re_evaluate_feedback(fb_id)
-    if not fb:
-        return jsonify({"success": False, "message": "Không tìm thấy góp ý này."}), 404
-    return jsonify({"success": True, "feedback": fb})
-
-
-@app.route("/api/admin/feedback/delete", methods=["POST"])
-def api_admin_feedback_delete():
-    """Admin endpoint: Delete an individual feedback."""
-    if not check_admin_auth():
-        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
-
-    data = request.json or {}
-    fb_id = data.get("id", "").strip()
-    from src.feedback_manager import delete_feedback
-    ok = delete_feedback(fb_id)
-    return jsonify({"success": ok})
-
-
-@app.route("/api/admin/feedback/purge-spam", methods=["POST"])
-def api_admin_feedback_purge_spam():
-    """Admin endpoint: Purge all feedbacks classified at Level 10 (Spam)."""
-    if not check_admin_auth():
-        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
-
-    from src.feedback_manager import purge_spam_feedbacks
-    removed = purge_spam_feedbacks()
-    return jsonify({"success": True, "removed": removed})
-
-
 def run_app(port: int = None, open_browser: bool = True):
     if port is None:
         port = int(os.environ.get("PORT", 5000))
@@ -1982,6 +1998,9 @@ def run_app(port: int = None, open_browser: bool = True):
     # Start Telegram background daemon if not already started
     if not bot_daemon.running:
         bot_daemon.start()
+
+    # Start Keep-Alive daemon (if on Render or enabled)
+    start_keep_alive_daemon()
 
     if open_browser and not is_cloud and not os.environ.get("NO_BROWSER"):
         Timer(1.2, lambda: webbrowser.open(url)).start()

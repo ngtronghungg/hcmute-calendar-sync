@@ -210,22 +210,35 @@ def extract_course_search_keyword(text: str) -> Optional[str]:
     - 'học môn toán cao cấp khi nào' -> 'toán cao cấp'
     - 'phòng học tiếng anh' -> 'tiếng anh'
     - 'tìm môn ctm' -> 'ctm'
+    - 'môn kỹ thuật thủy lực khí nén học phòng nào' -> 'kỹ thuật thủy lực khí nén'
     """
+    norm = normalize_vietnamese(text)
+    # If the user is specifically asking about an exam, don't hijack it as a general course search
+    if any(w in norm for w in [
+        "mon thi", "thi ke tiep", "thi tiep theo", "mon sap thi",
+        "khi nao thi", "lich thi", "bao gio thi", "ca thi", "phong thi"
+    ]):
+        return None
+
     clean = text.strip()
     patterns = [
-        r"(?:môn|mon|học phần|hoc phan|lớp|lop|môn học|mon hoc)\s+([a-zA-Z0-9\s_À-ỹ\-\+]{2,30})",
-        r"(?:phòng|phong|giờ|gio|thời gian|thoi gian)\s+(?:học\s+|hoc\s+)?(?:môn\s+|mon\s+)?([a-zA-Z0-9\s_À-ỹ\-\+]{2,30})",
-        r"(?:tìm|tim|kiếm|kiem|tra cứu|tra cuu)\s+(?:môn\s+|mon\s+)?([a-zA-Z0-9\s_À-ỹ\-\+]{2,30})",
+        r"(?:môn|mon|học phần|hoc phan|lớp|lop|môn học|mon hoc)\s+([a-zA-Z0-9\s_À-ỹ\-\+]{2,40})",
+        r"(?:phòng|phong|giờ|gio|thời gian|thoi gian)\s+(?:học\s+|hoc\s+)?(?:môn\s+|mon\s+)?([a-zA-Z0-9\s_À-ỹ\-\+]{2,40})",
+        r"(?:tìm|tim|kiếm|kiem|tra cứu|tra cuu)\s+(?:môn\s+|mon\s+)?([a-zA-Z0-9\s_À-ỹ\-\+]{2,40})",
     ]
     for p in patterns:
         m = re.search(p, clean, re.IGNORECASE)
         if m:
             candidate = m.group(1).strip()
-            # remove common trailing question words
-            candidate = re.sub(r"\s+(?:học|hoc)?\s*(?:ở đâu|o dau|ở phòng nào|o phong nao|phòng nào|phong nao|phòng mấy|phong may|khi nào|khi nao|mấy giờ|may gio|như thế nào|nhu the nao|nào|nao|thế nào|the nao)\??$", "", candidate, flags=re.IGNORECASE).strip()
-            candidate = re.sub(r"\s+(?:phòng|phong|lớp|lop|giờ|gio)\??$", "", candidate, flags=re.IGNORECASE).strip()
+            # 1. Strip trailing question phrases
+            candidate = re.sub(
+                r"(?i)\s+(?:ở đâu|o dau|ở phòng nào|o phong nao|phòng nào|phong nao|phòng mấy|phong may|khi nào|khi nao|mấy giờ|may gio|như thế nào|nhu the nao|là gì|la gi|thế nào|the nao|mấy|may|nào|nao)\??$",
+                "", candidate
+            ).strip()
+            # 2. Strip trailing action/location words
+            candidate = re.sub(r"(?i)\s+(?:học|hoc|phòng|phong|lớp|lop|giờ|gio)\??$", "", candidate).strip()
             candidate_norm = normalize_vietnamese(candidate)
-            if len(candidate) >= 2 and candidate_norm not in ["gi", "hoc", "thi", "nghi", "hom nay", "mai", "mot", "nay"]:
+            if len(candidate) >= 2 and candidate_norm not in ["gi", "hoc", "thi", "nghi", "hom nay", "mai", "mot", "nay", "ke tiep", "tiep theo"]:
                 return candidate
     return None
 
@@ -295,10 +308,86 @@ def format_classes_for_date(target_date: date, date_label: str, all_events: list
     return "\n".join(lines)
 
 
+def format_next_exam(client: Any = None, chat_id: Optional[str] = None) -> str:
+    """Format specifically the upcoming exam closest to current date and time."""
+    from src.telegram_bot import load_feed_cache, load_cached_exams, get_student_identity
+    all_events = load_feed_cache()
+    exams = [
+        e for e in all_events
+        if (getattr(e, "event_type", "") or "").upper() in ("EXAM", "THI") or "THI" in (e.title or "").upper()
+    ]
+    if not exams:
+        exams = load_cached_exams()
+
+    now = get_vietnam_now()
+    upcoming = [e for e in exams if e.end_datetime >= now]
+    upcoming.sort(key=lambda x: x.start_datetime)
+
+    student_name, student_mssv = get_student_identity(chat_id, client)
+
+    if not upcoming:
+        if exams:
+            exams.sort(key=lambda x: x.start_datetime, reverse=True)
+            last_ex = exams[0]
+            return (
+                f"🎉 <b>Chúc mừng {student_name}!</b>\n\n"
+                f"Bạn không còn môn thi nào sắp tới trong kỳ này (Môn gần nhất là <b>{last_ex.title}</b> đã thi xong vào ngày {last_ex.start_datetime.strftime('%d/%m/%Y')}).\n"
+                "Chúc bạn có một kỳ nghỉ thật vui vẻ hoặc chuẩn bị tốt cho học kỳ tiếp theo nha! 🏖️🍹"
+            )
+        return "📝 <b>Hiện tại trường chưa công bố lịch thi kết thúc học phần cho bạn!</b>"
+
+    next_ex = upcoming[0]
+    diff_days = (next_ex.start_datetime.date() - now.date()).days
+    if diff_days == 0:
+        time_badge = "🔥 <b>HÔM NAY</b>"
+    elif diff_days == 1:
+        time_badge = "⚡ <b>NGÀY MAI</b>"
+    else:
+        time_badge = f"⏳ <b>Còn {diff_days} ngày nữa</b>"
+
+    time_str = next_ex.start_datetime.strftime("%H:%M ngày %d/%m/%Y")
+    room_str = next_ex.location or "Xem cổng trường online.hcmute.edu.vn"
+
+    lines = [
+        f"🎯 <b>MÔN THI KẾ TIẾP CỦA BẠN:</b>\n",
+        f"📚 Môn thi: <b>{next_ex.title}</b>",
+        f"⏰ Thời gian: <b>{time_str}</b> ({time_badge})",
+        f"📍 Phòng thi: <b>{room_str}</b>\n",
+    ]
+
+    if len(upcoming) > 1:
+        lines.append(f"<i>(Sau môn này bạn còn {len(upcoming) - 1} môn thi nữa. Bấm '📝 Lịch thi' để xem toàn bộ danh sách nhé!)</i>")
+    else:
+        lines.append("<i>Đây là môn thi cuối cùng trong kỳ này của bạn rồi đó! Chúc bạn thi thật tốt và đạt điểm cao nha! 💪🎓</i>")
+
+    return "\n".join(lines)
+
+
 def search_and_format_course(keyword: str, all_events: list, cancelled_set: set) -> Optional[str]:
     """Search for a specific subject by name or code and return full schedule."""
     norm_kw = normalize_vietnamese(keyword)
     if not norm_kw:
+        return None
+
+    # HCMUTE student common acronyms
+    acronyms = {
+        "ctm": "cong nghe che tao may",
+        "gdtc": "giao duc the chat",
+        "ttnt": "tri tue nhan tao",
+        "ktlt": "ky thuat lap trinh",
+        "shcd": "sinh hoat cong dan",
+        "dstt": "dai so tuyen tinh",
+        "gtdc": "giai tich dai cuong",
+    }
+    for acr, expansion in acronyms.items():
+        if acr == norm_kw or f" {acr} " in f" {norm_kw} ":
+            norm_kw = re.sub(rf"\b{acr}\b", expansion, norm_kw).strip()
+
+    stopwords = {"mon", "hoc", "lop", "o", "dau", "phong", "nao", "khi", "gio", "la", "gi", "phan", "tim"}
+    kw_words = [w for w in re.findall(r"\w+", norm_kw) if w not in stopwords]
+    if not kw_words:
+        kw_words = [w for w in re.findall(r"\w+", norm_kw)]
+    if not kw_words:
         return None
 
     matched_events = []
@@ -307,18 +396,32 @@ def search_and_format_course(keyword: str, all_events: list, cancelled_set: set)
             title_norm = normalize_vietnamese(ev.title)
             desc_norm = normalize_vietnamese(ev.description or "")
             loc_norm = normalize_vietnamese(ev.location or "")
-            if norm_kw in title_norm or norm_kw in desc_norm or norm_kw in loc_norm:
-                matched_events.append(ev)
+
+            # 1. Exact substring match
+            if norm_kw in title_norm or norm_kw in desc_norm:
+                matched_events.append((ev, 1.0))
+                continue
+
+            # 2. Token overlap fuzzy match (handles hyphens, brackets, word order)
+            all_text_words = set(re.findall(r"\w+", f"{title_norm} {desc_norm}"))
+            matches = sum(1 for w in kw_words if w in all_text_words)
+            overlap_score = matches / len(kw_words)
+            if overlap_score >= 0.6:
+                matched_events.append((ev, overlap_score))
 
     if not matched_events:
         return None
 
-    # Group by title
-    matched_events.sort(key=lambda x: x.start_datetime)
-    now = get_vietnam_now()
-    upcoming = [e for e in matched_events if e.end_datetime >= now and e.uid not in cancelled_set]
+    # Group and pick top title
+    matched_events.sort(key=lambda x: (x[1], -x[0].start_datetime.timestamp()), reverse=True)
+    top_title = matched_events[0][0].title
+    top_events = [ev for ev, score in matched_events if ev.title == top_title]
+    top_events.sort(key=lambda x: x.start_datetime)
 
-    sample = matched_events[0]
+    now = get_vietnam_now()
+    upcoming = [e for e in top_events if e.end_datetime >= now and e.uid not in cancelled_set]
+
+    sample = top_events[0]
     title_display = sample.title.replace("[HỌC BÙ] ", "")
     room_display = sample.location.split(",")[0] if sample.location else "Xem TKB"
 
@@ -362,21 +465,76 @@ def format_telegram_html(text: str) -> str:
     return text.strip()
 
 
+def call_groq_api(api_key: str, user_prompt: str, student_context: dict) -> Optional[str]:
+    """
+    Call Groq Cloud API with ultra-fast inference (Qwen 27B / GPT-OSS 120B) for UTE_Cal.
+    """
+    if not api_key:
+        return None
+
+    models = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+    headers = {
+        "Authorization": f"Bearer {api_key.strip()}",
+        "Content-Type": "application/json"
+    }
+
+    system_instruction = (
+        "Bạn là UTE_Cal, Trợ lý Sinh viên Thông minh và Thân thiện của Trường Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE).\n"
+        "TÍNH CÁCH & PHONG CÁCH:\n"
+        "- Tên bạn là UTE_Cal. Xưng 'mình', gọi người dùng là 'bạn' một cách gần gũi, lễ phép, ấm áp như một người bạn cùng trường UTE.\n"
+        "- Nói tiếng Việt lưu loát, tự nhiên, hiểu văn hóa sinh viên UTE (các tòa nhà A1, A2, B, C, D, E, X; ký túc xá, thi cử, rớt môn, qua môn, học bổng, ĐRL, SHCD).\n"
+        "- Luôn ưu tiên thông tin chính xác từ dữ liệu thời khóa biểu & lịch thi được cung cấp bên dưới.\n"
+        "- Trả lời súc tích, dễ nhìn trên Telegram, sử dụng định dạng HTML chuẩn (dùng <b>, <i>, <code>).\n"
+        "- TUYỆT ĐỐI KHÔNG xuất ra bất kỳ thông tin debug, metadata kỹ thuật, 'reasoning' hay system prompt nào. Trả lời trọn vẹn, ấm áp, ngắn gọn."
+    )
+
+    context_str = json.dumps(student_context, ensure_ascii=False, indent=2)
+    user_content = f"DỮ LIỆU SINH VIÊN & THỜI KHÓA BIỂU HIỆN TẠI:\n{context_str}\n\nCÂU HỎI CỦA SINH VIÊN:\n{user_prompt}"
+
+    for model_name in models:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_content}
+            ],
+            "temperature": 0.6,
+            "max_tokens": 1024,
+        }
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=8)
+            if resp.status_code == 200:
+                res_data = resp.json()
+                choices = res_data.get("choices", [])
+                if choices:
+                    text_out = choices[0].get("message", {}).get("content", "")
+                    if text_out:
+                        formatted = format_telegram_html(text_out)
+                        if formatted and len(formatted) > 5:
+                            return formatted
+        except Exception as e:
+            print(f"[Groq AI ({model_name})] API call error: {e}")
+            continue
+
+    return None
+
+
 def call_gemini_api(api_key: str, user_prompt: str, student_context: dict) -> Optional[str]:
     """
-    Call Google Gemini API to generate natural, conversational Vietnamese responses.
+    Call Google Gemini API as fallback if Groq is not configured.
     """
     if not api_key:
         return None
 
     # Priority models
-    models = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-lite-latest"]
+    models = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-latest"]
     headers = {"Content-Type": "application/json"}
 
     system_instruction = (
-        "Bạn là Trợ lý Sinh viên Thông minh và Thân thiện của Trường Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE).\n"
+        "Bạn là UTE_Cal, Trợ lý Sinh viên Thông minh và Thân thiện của Trường Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE).\n"
         "TÍNH CÁCH & PHONG CÁCH:\n"
-        "- Xưng 'mình', gọi người dùng là 'bạn' một cách gần gũi, lễ phép, ấm áp như một người bạn cùng trường UTE.\n"
+        "- Tên bạn là UTE_Cal. Xưng 'mình', gọi người dùng là 'bạn' một cách gần gũi, lễ phép, ấm áp như một người bạn cùng trường UTE.\n"
         "- Nói tiếng Việt lưu loát, tự nhiên, hiểu văn hóa sinh viên UTE (các tòa nhà A1, A2, B, C, D, E, X; ký túc xá, thi cử, rớt môn, qua môn, học bổng).\n"
         "- Luôn ưu tiên thông tin chính xác từ dữ liệu thời khóa biểu & lịch thi được cung cấp bên dưới.\n"
         "- Trả lời súc tích, dễ nhìn trên Telegram, sử dụng định dạng HTML chuẩn (dùng <b>, <i>, <code>).\n"
@@ -406,7 +564,7 @@ def call_gemini_api(api_key: str, user_prompt: str, student_context: dict) -> Op
     for model_name in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key.strip()}"
         try:
-            resp = requests.post(url, headers=headers, json=prompt_payload, timeout=12)
+            resp = requests.post(url, headers=headers, json=prompt_payload, timeout=8)
             if resp.status_code == 200:
                 res_data = resp.json()
                 candidates = res_data.get("candidates", [])
@@ -432,13 +590,14 @@ def generate_conversational_reply(
     all_events: list,
     cancelled_set: set,
     votes_db: dict,
+    groq_key: str = "",
     gemini_key: str = "",
 ) -> Tuple[str, Optional[dict]]:
     """
-    Main Conversational Brain:
+    Main Conversational Brain (UTE_Cal):
     1. Instantly resolves structured schedule queries (week, day, exams, subjects, cancellations)
        with 100% verified campus data (0ms latency, zero hallucinations).
-    2. Uses Gemini AI for free-form conversational Q&A, guidance, and campus life chit-chat.
+    2. Uses Groq Cloud AI (Qwen 27B / GPT-OSS 120B) for natural conversational Q&A, guidance, and campus life chit-chat.
     """
     now = get_vietnam_now()
     norm = normalize_vietnamese(text)
@@ -457,19 +616,34 @@ def generate_conversational_reply(
         reply_txt = format_classes_for_date(target_d, label_d, all_events, cancelled_set, student_name=student_name)
         return reply_txt, None
 
-    # 3. Specific Subject Search (môn Triết, môn CTM, Toán cao cấp, Tiếng Anh...)
+    # 3. Exam Schedule & Next Exam (môn thi kế tiếp là gì, khi nào thi, lịch thi, môn sắp thi...)
+    is_exam_query = any(w in norm for w in [
+        "lich thi", "khi nao thi", "bao gio thi", "thi cu", "phong thi", "ca thi",
+        "co lich thi chua", "mon thi", "thi ke tiep", "thi tiep theo", "mon sap thi"
+    ])
+    if is_exam_query:
+        is_next_exam = any(w in norm for w in ["ke tiep", "tiep theo", "sap thi", "gan nhat", "toi day", "tiep"])
+        if is_next_exam or "mon thi" in norm:
+            return format_next_exam(client, chat_id=chat_id), None
+        from src.telegram_bot import format_upcoming_exams
+        return format_upcoming_exams(client, chat_id=chat_id), None
+
+    # 4. Specific Subject Search (môn Triết, môn CTM, môn kỹ thuật thủy lực khí nén học phòng nào...)
     course_kw = extract_course_search_keyword(text)
     if course_kw:
         res_course = search_and_format_course(course_kw, all_events, cancelled_set)
         if res_course:
             return res_course, None
 
-    # 4. Exam Schedule (khi nào thi, lịch thi, bao giờ thi...)
-    if any(w in norm for w in ["lich thi", "khi nao thi", "bao gio thi", "thi cu", "phong thi", "ca thi", "co lich thi chua"]):
-        from src.telegram_bot import format_upcoming_exams
-        return format_upcoming_exams(client, chat_id=chat_id), None
+    # 5. Common Subject Keyword fallback (ctm, triet, toan, ly, hoa, the duc...)
+    common_subjects = ["triet", "toan", "ly", "hoa", "anh", "tieng anh", "ctm", "the duc", "gdtc", "lap trinh", "chuyen nganh", "do an"]
+    for s in common_subjects:
+        if s in norm.split():
+            res_course = search_and_format_course(s, all_events, cancelled_set)
+            if res_course:
+                return res_course, None
 
-    # 5. Cancellation questions (có được nghỉ không, môn nào nghỉ, báo nghỉ...)
+    # 6. Cancellation questions (có được nghỉ không, môn nào nghỉ, báo nghỉ...)
     if any(w in norm for w in ["duoc nghi khong", "co nghi khong", "bao nghi", "nghi hoc", "co mon nao nghi", "thay co bao nghi"]):
         cancelled_list = [e for e in all_events if e.uid in cancelled_set and e.end_datetime >= now]
         if cancelled_list:
@@ -482,20 +656,34 @@ def generate_conversational_reply(
         else:
             return "✔ <b>Hiện tại không có môn nào giảng viên cho nghỉ!</b>\nBạn đi học đúng giờ và nhớ chú ý an toàn trên đường đến trường nha! 🛵🏫", None
 
-    # 6. Tuition & Deadlines (học phí, tiền học, deadline...)
+    # 7. Tuition & Deadlines (học phí, tiền học, deadline...)
     if any(w in norm for w in ["hoc phi", "tien hoc", "dong tien", "deadline", "han chot", "shcd", "tin chi"]):
         from src.telegram_bot import format_reminders
         return format_reminders(client), None
 
-    # 7. Greetings / Chào hỏi
+    # 8. Bot Identity / Hướng dẫn chức năng
+    if any(w in norm for w in ["ban la ai", "may la ai", "bot la ai", "ten gi", "gioi thieu", "chuc nang", "huong dan"]):
+        intro = (
+            f"🤖 <b>Chào bạn, mình là UTE_Cal!</b>\n\n"
+            "Mình là Trợ lý Thời khóa biểu & Đồng hành Sinh viên của <b>Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE)</b> với các khả năng tự động:\n"
+            "• ☀️ <b>Nhắc lịch mỗi sáng:</b> 06:30 sáng tự động gửi môn học & phòng học trong ngày.\n"
+            "• 📅 <b>Tra cứu lịch siêu nhanh:</b> Bạn chỉ cần hỏi tự nhiên <i>'mai học gì', 'thứ 5 học ở đâu', 'môn Triết học phòng nào'</i>...\n"
+            "• 🔥 <b>Đếm ngược lịch thi:</b> Cảnh báo phòng thi, giờ thi cận kề.\n"
+            "• 🏖️ <b>Đánh dấu GV cho nghỉ:</b> Tự động xóa khỏi Lịch khi thầy/cô thông báo cho nghỉ.\n"
+            "• 💡 <b>Trò chuyện thông minh cùng Groq AI:</b> Giải đáp thắc mắc và tâm sự sinh viên.\n\n"
+            "Bạn thử nhắn <i>'mai học gì'</i> hoặc <i>'môn thi kế tiếp là gì'</i> xem sao nha! 😉"
+        )
+        return intro, None
+
+    # 9. Greetings / Chào hỏi
     if any(norm == w or norm.startswith(w + " ") for w in ["chao", "hi", "hello", "alo", "helo", "hi bot", "chao bot", "chao ban", "chao em"]):
         greeting = (
-            f"👋 <b>Chào {student_name}! Rất vui được hỗ trợ bạn!</b> 😊\n\n"
+            f"👋 <b>Chào {student_name}! Mình là UTE_Cal, rất vui được hỗ trợ bạn!</b> 😊\n\n"
             f"Mình là Trợ lý Thời khóa biểu & Lịch thi HCMUTE. Bạn muốn xem lịch học hôm nay, ngày mai, tuần sau, tra cứu phòng học hay kiểm tra lịch thi cứ hỏi tự nhiên nha!"
         )
         return greeting, None
 
-    # 8. Thanks / Cảm ơn
+    # 10. Thanks / Cảm ơn
     if any(w in norm for w in ["cam on", "thank", "tks", "cam on nha", "tuyet voi", "bot gioi qua", "ok bot", "da ro", "tot lam"]):
         replies = (
             f"Dạ không có chi nè {student_name}! 🥰\n\n"
@@ -503,8 +691,18 @@ def generate_conversational_reply(
         )
         return replies, None
 
-    # 9. Try Gemini AI for open-ended conversation & campus questions
-    if gemini_key:
+    # 11. Encouragement & Chit-chat (mệt quá, buồn quá, thi rớt, khó quá...)
+    if any(w in norm for w in ["met qua", "buon qua", "kho qua", "chan qua", "thi rot", "stress", "ap luc"]):
+        replies = (
+            f"Thương bạn {student_name} nhiều nè! 🥺 Cố lên nha!\n\n"
+            "Học ở HCMUTE bài vở và đồ án đôi khi hơi dồn dập, nhưng bạn đã đi được một chặng đường rất xa rồi đó! "
+            "Uống một ly trà sữa hoặc đi dạo quanh tòa A, hít thở một chút rồi tiếp tục chiến đấu nha! UTE_Cal luôn ở đây đồng hành cùng bạn! 💪🔥"
+        )
+        return replies, None
+
+    # 12. Try Groq AI (or Gemini fallback) for open-ended conversation & campus questions
+    ai_key = groq_key or gemini_key
+    if ai_key:
         upcoming_events_summary = []
         for e in all_events[:25]:
             if e.end_datetime >= now - timedelta(days=1) and e.uid not in cancelled_set:
@@ -524,112 +722,24 @@ def generate_conversational_reply(
             "schedule": upcoming_events_summary,
             "cancelled_count": len(cancelled_set),
         }
-        ai_reply = call_gemini_api(gemini_key, text, context_dict)
+        if groq_key or ai_key.startswith("gsk_"):
+            ai_reply = call_groq_api(ai_key, text, context_dict)
+        else:
+            ai_reply = call_gemini_api(ai_key, text, context_dict)
+            if not ai_reply:
+                ai_reply = call_groq_api(ai_key, text, context_dict)
+
         if ai_reply:
             return ai_reply, None
 
-    # 10. Fallback: Friendly guidance
-    reply = (
-        f"👋 <b>Xin chào {student_name}!</b>\n\n"
-        "Mình luôn sẵn sàng giải đáp thời khóa biểu cho bạn. Bạn có thể hỏi mình rất tự nhiên như:\n"
-        "• <i>'tuần sau tôi học gì'</i>\n"
-        "• <i>'ngày mai học phòng nào'</i>\n"
-        "• <i>'khi nào thi môn kế tiếp'</i>\n"
-        "• <i>'môn công nghệ kim loại học ở đâu'</i>"
-    )
-    return reply, None
-
-    # A. Greetings / Chào hỏi
-    if any(norm == w or norm.startswith(w + " ") for w in ["chao", "hi", "hello", "alo", "helo", "hi bot", "chao bot", "chao ban", "chao em"]):
-        greeting = (
-            f"👋 <b>Chào {student_name}! Rất vui được gặp bạn!</b> 😊\n\n"
-            f"Mình là Trợ lý Thời khóa biểu & Lịch thi HCMUTE. Bạn muốn xem lịch học hôm nay, ngày mai, tra cứu phòng học hay kiểm tra lịch thi cứ bảo mình nha!"
-        )
-        return greeting, None
-
-    # B. Thanks / Cảm ơn
-    if any(w in norm for w in ["cam on", "thank", "tks", "cam on nha", "tuyet voi", "bot gioi qua", "ok bot", "da ro", "tot lam"]):
-        replies = (
-            f"Dạ không có chi nè {student_name}! 🥰\n\n"
-            "Cần kiểm tra phòng học, giờ thi hay báo nghỉ môn nào cứ ới mình bất kỳ lúc nào nhé. Chúc bạn một kỳ học thật bùng nổ và đạt GPA thật cao nha! 🎓✨"
-        )
-        return replies, None
-
-    # C. Bot Identity / Bạn là ai
-    if any(w in norm for w in ["ban la ai", "may la ai", "bot la ai", "ten gi", "gioi thieu", "chuc nang", "huong dan"]):
-        intro = (
-            f"🤖 <b>Chào bạn, mình là Trợ lý HCMUTE Calendar!</b>\n\n"
-            "Mình được tạo ra để đồng hành cùng các bạn sinh viên <b>Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE)</b> với các khả năng tự động:\n"
-            "• ☀️ <b>Nhắc lịch mỗi sáng:</b> 06:30 sáng tự động gửi môn học & phòng học trong ngày.\n"
-            "• 📅 <b>Tra cứu lịch siêu nhanh:</b> Bạn chỉ cần hỏi tự nhiên <i>'mai học gì', 'thứ 5 học ở đâu', 'môn Triết học phòng nào'</i>...\n"
-            "• 🔥 <b>Đếm ngược lịch thi:</b> Cảnh báo phòng thi, giờ thi cận kề.\n"
-            "• 🏖️ <b>Đánh dấu GV cho nghỉ:</b> Tự động xóa khỏi Lịch khi thầy/cô thông báo cho nghỉ.\n\n"
-            "Bạn thử nhắn <i>'mai học gì'</i> xem sao nha! 😉"
-        )
-        return intro, None
-
-    # D. Relative Date Schedule (mai học gì, thứ 5 học ở đâu, hôm nay học gì...)
-    rel_date_match = parse_relative_date(text, ref_now=now)
-    if rel_date_match:
-        target_d, label_d = rel_date_match
-        reply_txt = format_classes_for_date(target_d, label_d, all_events, cancelled_set, student_name=student_name)
-        return reply_txt, None
-
-    # E. Specific Subject Search (môn Triết, môn CTM, Toán cao cấp, Tiếng Anh...)
-    course_kw = extract_course_search_keyword(text)
-    if course_kw:
-        res_course = search_and_format_course(course_kw, all_events, cancelled_set)
-        if res_course:
-            return res_course, None
-
-    # Try simple subject keywords in text
-    common_subjects = ["triet", "toan", "ly", "hoa", "anh", "tieng anh", "ctm", "the duc", "gdtc", "lap trinh", "co so", "chuyen nganh", "do an"]
-    for s in common_subjects:
-        if s in norm:
-            res_course = search_and_format_course(s, all_events, cancelled_set)
-            if res_course:
-                return res_course, None
-
-    # F. Exam Schedule (khi nào thi, lịch thi, bao giờ thi...)
-    if any(w in norm for w in ["lich thi", "khi nao thi", "bao gio thi", "thi cu", "phong thi", "ca thi", "co lich thi chua"]):
-        from src.telegram_bot import format_upcoming_exams
-        return format_upcoming_exams(client, chat_id=chat_id), None
-
-    # G. Cancellation questions (có được nghỉ không, môn nào nghỉ, báo nghỉ...)
-    if any(w in norm for w in ["duoc nghi khong", "co nghi khong", "bao nghi", "nghi hoc", "co mon nao nghi", "thay co bao nghi"]):
-        cancelled_list = [e for e in all_events if e.uid in cancelled_set and e.end_datetime >= now]
-        if cancelled_list:
-            lines = [f"🏖️ <b>HIỆN TẠI CÓ {len(cancelled_list)} BUỔI HỌC GIẢNG VIÊN CHO NGHỈ:</b>\n"]
-            for c in cancelled_list[:5]:
-                dt_str = c.start_datetime.strftime("%d/%m/%Y lúc %H:%M")
-                lines.append(f"• 🏖️ <b>{c.title}</b> ({dt_str})")
-            lines.append("\n✔ Các buổi học này đã được xóa khỏi Lịch của bạn rồi nha!")
-            return "\n".join(lines), None
-        else:
-            return "✔ <b>Hiện tại không có môn nào giảng viên cho nghỉ!</b>\nBạn đi học đúng giờ và nhớ chú ý an toàn trên đường đến trường nha! 🛵🏫", None
-
-    # H. Tuition & Deadlines (học phí, tiền học, deadline...)
-    if any(w in norm for w in ["hoc phi", "tien hoc", "dong tien", "deadline", "han chot", "shcd", "tin chi"]):
-        from src.telegram_bot import format_reminders
-        return format_reminders(client), None
-
-    # I. Encouragement & Chit-chat (mệt quá, buồn quá, thi rớt, khó quá...)
-    if any(w in norm for w in ["met qua", "buon qua", "kho qua", "chan qua", "thi rot", "stress", "ap luc"]):
-        replies = (
-            f"Thương bạn {student_name} nhiều nè! 🥺 Cố lên nha!\n\n"
-            "Học ở HCMUTE bài vở và đồ án đôi khi hơi dồn dập, nhưng bạn đã đi được một chặng đường rất xa rồi đó! "
-            "Uống một ly trà sữa hoặc đi dạo quanh tòa A, hít thở một chút rồi tiếp tục chiến đấu nha! Mình luôn ở đây nhắc lịch cho bạn, bạn không một mình đâu! 💪🔥"
-        )
-        return replies, None
-
-    # J. Default Friendly Conversational Guidance
+    # 13. Default Conversational Fallback
     default_text = (
-        f"🤔 Mình nghe bạn nói rồi nè {student_name}!\n\n"
-        "Bạn có thể trò chuyện tự nhiên với mình về lịch học và lịch thi, ví dụ như:\n"
-        "• <i>'Mai tui có học gì hông?'</i>\n"
-        "• <i>'Thứ 5 học môn gì ở phòng nào?'</i>\n"
-        "• <i>'Khi nào thi môn Giải tích?'</i>\n"
-        "• <i>'Hôm nay có môn nào được nghỉ không?'</i>\n\n"
-        "Hoặc bạn bấm nhanh các nút bên dưới để mình hỗ trợ tức thì nhé! 👇"
+        f"🤔 Mình chưa hiểu rõ yêu cầu này của bạn nè {student_name}!\n\n"
+        "Bạn có thể nhắn cho mình như các câu sau:\n"
+        "• <i>'Mai tui học gì ở phòng nào?'</i>\n"
+        "• <i>'Môn thi kế tiếp là gì?'</i>\n"
+        "• <i>'Môn kỹ thuật thủy lực khí nén học phòng nào?'</i>\n"
+        "• <i>'Tuần sau có môn nào không?'</i>\n\n"
+        "Hoặc bạn bấm nhanh các nút bên dưới để xem lịch tức thì nhé! 👇"
     )
     return default_text, None

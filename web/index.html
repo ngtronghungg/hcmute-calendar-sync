@@ -7,8 +7,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#09090b">
   <title>UTECal - HCMUTE Calendar & Sync</title>
-  <!-- Google Sign-In Identity Services SDK -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     :root {
       --bg: #09090b;
@@ -1119,34 +1117,6 @@
     .tab-text-short { display: none; }
     .tab-text-full { display: inline; }
 
-    .fb-cat-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 10px 8px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--surface-border);
-      border-radius: var(--radius-md);
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-align: center;
-      user-select: none;
-    }
-    .fb-cat-btn:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: #fff;
-    }
-    .fb-cat-btn.active {
-      background: rgba(14, 165, 233, 0.16);
-      border-color: rgba(14, 165, 233, 0.45);
-      color: #38bdf8;
-      font-weight: 600;
-    }
-
     /* ==========================================================================
        MOBILE & RESPONSIVE PERFECTION (iOS Safari & Android Chrome)
        ========================================================================== */
@@ -1345,6 +1315,224 @@
         grid-template-columns: 1fr !important;
       }
     }
+
+    /* ==========================================================================
+       EXAM COUNTDOWN HERO WIDGET
+       ========================================================================== */
+    .exam-countdown-hero {
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(20, 20, 26, 0.88) 100%);
+      border: 1px solid rgba(220, 38, 38, 0.4);
+      border-radius: 18px;
+      padding: 22px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(220, 38, 38, 0.18);
+      position: relative;
+      overflow: hidden;
+    }
+    .exam-countdown-hero::before {
+      content: "";
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 150px;
+      height: 150px;
+      background: radial-gradient(circle, rgba(220, 38, 38, 0.28) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .exam-hero-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .exam-hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(220, 38, 38, 0.25);
+      color: #fca5a5;
+      border: 1px solid rgba(220, 38, 38, 0.45);
+      padding: 4px 12px;
+      border-radius: var(--radius-full);
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .exam-hero-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 14px;
+      line-height: 1.35;
+    }
+    .exam-timer-grid {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .timer-unit {
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 8px 16px;
+      text-align: center;
+      min-width: 68px;
+    }
+    .timer-unit-num {
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      font-family: var(--font-mono);
+      line-height: 1;
+    }
+    .timer-unit-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+    }
+    .exam-meta-pills {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 12.5px;
+      color: var(--text-subtle);
+    }
+    .exam-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ==========================================================================
+       AI CHAT WIDGET (UTE_Cal)
+       ========================================================================== */
+    .fab-chat {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 990;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-full);
+      padding: 12px 20px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 8px 28px rgba(2, 132, 199, 0.45);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .fab-chat:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 34px rgba(2, 132, 199, 0.6);
+    }
+    .ai-chat-drawer {
+      position: fixed;
+      bottom: 86px;
+      right: 24px;
+      width: min(390px, calc(100vw - 32px));
+      height: min(560px, calc(100vh - 120px));
+      background: rgba(18, 18, 24, 0.95);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid var(--surface-border-strong);
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.7);
+      z-index: 991;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: drawerSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes drawerSlideUp {
+      from { opacity: 0; transform: translateY(16px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .chat-drawer-header {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--surface-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .chat-drawer-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chat-drawer-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .chat-bubble {
+      max-width: 86%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .chat-bubble.bot {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--surface-border);
+      color: var(--text-main);
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    .chat-bubble.user {
+      background: #0284c7;
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-quick-prompts {
+      padding: 8px 14px 4px;
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+    .chat-quick-prompts::-webkit-scrollbar { display: none; }
+    .chat-prompt-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-full);
+      padding: 4px 10px;
+      font-size: 11.5px;
+      color: var(--text-subtle);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .chat-prompt-pill:hover {
+      background: rgba(14, 165, 233, 0.15);
+      color: var(--accent-blue);
+      border-color: rgba(14, 165, 233, 0.35);
+    }
+    .chat-drawer-input-row {
+      padding: 12px 14px;
+      border-top: 1px solid var(--surface-border);
+      display: flex;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.02);
+    }
   </style>
 </head>
 <body>
@@ -1382,10 +1570,6 @@
         <span class="tab-icon">⚡</span>
         <span class="tab-text">Đồng bộ</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('feedback')">
-        <span class="tab-icon">💡</span>
-        <span class="tab-text"><span class="tab-text-full">Gợi ý</span><span class="tab-text-short">Góp ý</span></span>
-      </button>
     </nav>
 
     <!-- Header Actions -->
@@ -1414,14 +1598,11 @@
 
       <!-- Segmented Mode Switcher -->
       <div style="display: flex; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--surface-border); border-radius: var(--radius-full); padding: 3px; margin-bottom: 20px;">
-        <button type="button" id="tabLoginPass" class="tab-btn active" style="flex: 1; font-size: 12.5px; padding: 8px 10px; justify-content: center;" onclick="toggleLoginMode('pass')">
+        <button type="button" id="tabLoginPass" class="tab-btn active" style="flex: 1; font-size: 13px; padding: 8px 14px; justify-content: center;" onclick="toggleLoginMode('pass')">
           Tài khoản MSSV
         </button>
-        <button type="button" id="tabLoginGoogle" class="tab-btn" style="flex: 1; font-size: 12.5px; padding: 8px 10px; justify-content: center;" onclick="toggleLoginMode('google')">
-          Google UTE
-        </button>
-        <button type="button" id="tabLoginToken" class="tab-btn" style="flex: 1; font-size: 12.5px; padding: 8px 10px; justify-content: center;" onclick="toggleLoginMode('token')">
-          Session Token
+        <button type="button" id="tabLoginToken" class="tab-btn" style="flex: 1; font-size: 13px; padding: 8px 14px; justify-content: center;" onclick="toggleLoginMode('token')">
+          Session Token (Đăng nhập Google)
         </button>
       </div>
 
@@ -1441,35 +1622,24 @@
           </button>
         </form>
 
-        <!-- Google Form -->
-        <div id="formLoginGoogle" class="hidden" style="text-align: center; padding: 8px 0;">
-          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.5;">
-            Đăng nhập bằng tài khoản Google trường cấp<br>
-            <span style="color: #38bdf8; font-weight: 600;">@student.hcmute.edu.vn</span>
+        <!-- Token-Only Form (For students using Google on online.hcmute.edu.vn) -->
+        <form id="formLoginToken" class="hidden" onsubmit="handleTokenLogin(event)">
+          <div style="font-size: 12px; color: var(--accent-blue); line-height: 1.5; margin-bottom: 14px; background: rgba(14, 165, 233, 0.08); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(14, 165, 233, 0.2);">
+            💡 <strong>Dành cho sinh viên đăng nhập Google:</strong> Nếu bạn đăng nhập cổng trường bằng Google, hãy mở <a href="https://online.hcmute.edu.vn" target="_blank" style="color: #38bdf8; font-weight: 600;">online.hcmute.edu.vn</a> ➔ F12 (Application ➔ LocalStorage) copy <code>Token</code> và dán vào bên dưới:
           </div>
-
-          <div style="display: flex; justify-content: center; margin-bottom: 16px;">
-            <div id="g_id_onload"
-                 data-client_id="964854159694-3psqmro01jvt4uloj0dkrruvt4c4asso.apps.googleusercontent.com"
-                 data-context="signin"
-                 data-ux_mode="popup"
-                 data-callback="handleGoogleLoginCallback"
-                 data-auto_prompt="false">
-            </div>
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-shape="pill"
-                 data-theme="filled_black"
-                 data-text="signin_with"
-                 data-size="large"
-                 data-logo_alignment="left">
-            </div>
+          <div class="form-group">
+            <label class="form-label">MSSV (Tùy chọn)</label>
+            <input type="text" id="tokenMssvInput" class="input-control" placeholder="Nhập MSSV gồm 8 chữ số...">
           </div>
-
-          <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 11.5px; color: var(--text-subtle); line-height: 1.5;">
-            🔒 Xác thực trực tiếp qua Cổng đào tạo HCMUTE với Google Client ID chính thức của trường.
+          <div class="form-group">
+            <label class="form-label">Bearer Token</label>
+            <textarea id="tokenRawInput" class="input-control" rows="3" placeholder="eyJhbGciOi..." required style="font-family: var(--font-mono); font-size: 12px; resize: none;"></textarea>
           </div>
-        </div>
+          <button type="submit" class="btn-primary" id="loginTokenSubmitBtn" style="width: 100%; margin-top: 8px;">
+            <span>Đồng bộ bằng Token</span>
+          </button>
+        </form>
+      </div>
 
         <!-- Token-Only Form -->
         <form id="formLoginToken" class="hidden" onsubmit="handleTokenLogin(event)">
@@ -1650,6 +1820,8 @@
             </button>
           </div>
         </div>
+        <!-- Hero Countdown Widget -->
+        <div id="examCountdownHero" class="exam-countdown-hero hidden"></div>
         <div class="schedule-grid" id="examsGrid">
           <!-- Populated by JS -->
         </div>
@@ -1792,120 +1964,6 @@
           <input type="checkbox" id="syncOptExams" checked>
           <input type="checkbox" id="syncOptReminders">
           <div id="tgConfigFields"></div>
-        </div>
-      </section>
-
-      <!-- 6. FEEDBACK & SUGGESTIONS TAB (AI 10-LEVEL EVALUATION) -->
-      <section id="feedbackTab" class="hidden">
-        <div class="schedule-header" style="margin-bottom: 24px;">
-          <div>
-            <div class="schedule-title" style="display: flex; align-items: center; gap: 8px;">
-              <span>💡 Hòm thư Gợi ý & Ý kiến</span>
-              <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-blue); border: 1px solid rgba(14, 165, 233, 0.3); font-size: 11px;">AI Thẩm định 10 cấp độ</span>
-            </div>
-            <div class="schedule-date" style="margin-top: 4px;">
-              Mọi ý kiến của bạn đều được AI tự động phân tích và xếp thứ tự ưu tiên gửi trực tiếp tới Ban Quản trị UTECal.
-            </div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
-          
-          <!-- Column 1: Submission Form -->
-          <div class="card" style="box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
-            <div style="font-weight: 600; font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
-              <span>✍️</span>
-              <span>Gửi ý kiến đóng góp mới</span>
-            </div>
-
-            <form id="feedbackForm" onsubmit="handleFeedbackSubmit(event)">
-              <!-- Category Selector -->
-              <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">Phân loại ý kiến</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="feedbackCategoryGroup">
-                  <label class="fb-cat-btn active" onclick="selectFbCategory('feature', this)">
-                    <input type="radio" name="fbCategory" value="feature" checked style="display: none;">
-                    <span>🚀 Tính năng mới</span>
-                  </label>
-                  <label class="fb-cat-btn" onclick="selectFbCategory('bug', this)">
-                    <input type="radio" name="fbCategory" value="bug" style="display: none;">
-                    <span>🐛 Báo lỗi / Sự cố</span>
-                  </label>
-                  <label class="fb-cat-btn" onclick="selectFbCategory('ui', this)">
-                    <input type="radio" name="fbCategory" value="ui" style="display: none;">
-                    <span>🎨 Giao diện & UX</span>
-                  </label>
-                  <label class="fb-cat-btn" onclick="selectFbCategory('other', this)">
-                    <input type="radio" name="fbCategory" value="other" style="display: none;">
-                    <span>💬 Ý kiến khác</span>
-                  </label>
-                </div>
-              </div>
-
-              <!-- Title -->
-              <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">Tiêu đề ngắn gọn</label>
-                <input type="text" id="fbInputTitle" class="input-control" placeholder="Tóm tắt ý kiến (VD: Thêm widget đếm ngược ngày thi)..." maxlength="120" required>
-              </div>
-
-              <!-- Content -->
-              <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">Nội dung chi tiết</label>
-                <textarea id="fbInputContent" class="input-control" rows="4" placeholder="Mô tả cụ thể mong muốn, hoàn cảnh sử dụng hoặc lỗi gặp phải..." required style="resize: vertical; font-size: 13px;"></textarea>
-              </div>
-
-              <!-- Anonymity Checkbox -->
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding: 10px 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: var(--radius-sm);">
-                <div>
-                  <div style="font-size: 12px; font-weight: 500;">Gửi ẩn danh</div>
-                  <div style="font-size: 11px; color: var(--text-subtle);">Không hiển thị công khai họ tên của bạn</div>
-                </div>
-                <label class="ios-switch">
-                  <input type="checkbox" id="fbInputAnonymous">
-                  <span class="slider"></span>
-                </label>
-              </div>
-
-              <!-- Submit Button -->
-              <button type="submit" class="btn-primary" id="fbSubmitBtn" style="width: 100%; justify-content: center; padding: 12px;">
-                <span>Gửi góp ý cho AI thẩm định</span>
-                <span>➔</span>
-              </button>
-            </form>
-
-            <!-- Instant AI Evaluation Banner -->
-            <div id="fbAiResultBanner" class="hidden" style="margin-top: 16px; padding: 14px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md);">
-              <div style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: #34d399; margin-bottom: 6px;">
-                <span style="display: flex; align-items: center; gap: 6px;">
-                  <span>🤖</span>
-                  <span>AI đã tiếp nhận & xếp hạng</span>
-                </span>
-                <span id="fbAiResultLevelBadge" class="badge" style="font-size: 11px; padding: 2px 8px;">Cấp 3</span>
-              </div>
-              <div id="fbAiResultSummary" style="font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 6px;"></div>
-              <div id="fbAiResultReco" style="font-size: 11px; color: var(--text-muted); font-style: italic;"></div>
-            </div>
-          </div>
-
-          <!-- Column 2: Previous Submissions -->
-          <div class="card" style="box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-              <div style="font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-                <span>📋</span>
-                <span>Lịch sử góp ý của bạn</span>
-              </div>
-              <button class="btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="loadMyFeedbacks()">
-                <span>🔄 Làm mới</span>
-              </button>
-            </div>
-
-            <div id="myFeedbacksContainer" style="display: flex; flex-direction: column; gap: 12px; max-height: 520px; overflow-y: auto; padding-right: 4px;">
-              <div style="text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 13px;">
-                Chưa có ý kiến nào được gửi. Hãy chia sẻ đóng góp của bạn để hoàn thiện UTECal nhé!
-              </div>
-            </div>
-          </div>
-
         </div>
       </section>
 
@@ -2156,6 +2214,10 @@
       document.getElementById('mainNav').classList.add('hidden');
       document.getElementById('userPill').classList.add('hidden');
       document.getElementById('logoutBtn').classList.add('hidden');
+      const fab = document.getElementById('fabAiChat');
+      if (fab) fab.classList.add('hidden');
+      const drawer = document.getElementById('aiChatDrawer');
+      if (drawer) drawer.classList.add('hidden');
     }
 
     function showDashboard() {
@@ -2164,6 +2226,8 @@
       document.getElementById('mainNav').classList.remove('hidden');
       document.getElementById('userPill').classList.remove('hidden');
       document.getElementById('logoutBtn').classList.remove('hidden');
+      const fab = document.getElementById('fabAiChat');
+      if (fab) fab.classList.remove('hidden');
 
       if (appState.profile) {
         document.getElementById('userNameDisplay').textContent =
@@ -2265,60 +2329,17 @@
 
     function toggleLoginMode(mode) {
       const tabPass = document.getElementById('tabLoginPass');
-      const tabGoogle = document.getElementById('tabLoginGoogle');
       const tabToken = document.getElementById('tabLoginToken');
       const formPass = document.getElementById('formLoginPass');
-      const formGoogle = document.getElementById('formLoginGoogle');
       const formToken = document.getElementById('formLoginToken');
       const errorDiv = document.getElementById('loginError');
       if (errorDiv) errorDiv.classList.add('hidden');
 
       tabPass?.classList.toggle('active', mode === 'pass');
-      tabGoogle?.classList.toggle('active', mode === 'google');
       tabToken?.classList.toggle('active', mode === 'token');
 
       formPass?.classList.toggle('hidden', mode !== 'pass');
-      formGoogle?.classList.toggle('hidden', mode !== 'google');
       formToken?.classList.toggle('hidden', mode !== 'token');
-    }
-
-    async function handleGoogleLoginCallback(response) {
-      const errorDiv = document.getElementById('loginError');
-      if (errorDiv) errorDiv.classList.add('hidden');
-
-      if (!response || !response.credential) {
-        if (errorDiv) {
-          errorDiv.textContent = 'Không nhận được mã xác thực từ Google.';
-          errorDiv.classList.remove('hidden');
-        }
-        return;
-      }
-
-      const tabBtn = document.getElementById('tabLoginGoogle');
-      if (tabBtn) tabBtn.textContent = 'Đang xác thực...';
-
-      try {
-        const res = await fetch('/api/login/google', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ credential: response.credential })
-        });
-        const data = await res.json();
-        if (!data.success) {
-          throw new Error(data.message || 'Đăng nhập Google thất bại');
-        }
-        localStorage.setItem('hcmute_session_token', data.session_token);
-        appState.authenticated = true;
-        appState.profile = data.profile;
-        showDashboard();
-      } catch (err) {
-        if (errorDiv) {
-          errorDiv.textContent = err.message || 'Lỗi xác thực tài khoản Google với trường.';
-          errorDiv.classList.remove('hidden');
-        }
-      } finally {
-        if (tabBtn) tabBtn.textContent = 'Google UTE';
-      }
     }
 
     async function handleTokenLogin(e) {
@@ -2403,8 +2424,6 @@
       document.getElementById('examsTab').classList.add('hidden');
       document.getElementById('telegramTab').classList.add('hidden');
       document.getElementById('syncTab').classList.add('hidden');
-      const fbTab = document.getElementById('feedbackTab');
-      if (fbTab) fbTab.classList.add('hidden');
 
       if (tabName === 'schedule') document.getElementById('scheduleTab').classList.remove('hidden');
       if (tabName === 'reminders') document.getElementById('remindersTab').classList.remove('hidden');
@@ -2415,10 +2434,6 @@
       }
       if (tabName === 'sync') {
         document.getElementById('syncTab').classList.remove('hidden');
-      }
-      if (tabName === 'feedback') {
-        if (fbTab) fbTab.classList.remove('hidden');
-        loadMyFeedbacks();
       }
     }
 
@@ -3021,6 +3036,53 @@
       if (!grid) return;
 
       const now = new Date();
+      const heroEl = document.getElementById('examCountdownHero');
+      const upcomingSorted = (exams || [])
+        .filter(e => new Date(e.start) >= now)
+        .sort((a, b) => new Date(a.start) - new Date(b.start));
+
+      if (heroEl) {
+        if (upcomingSorted.length > 0) {
+          const nextExam = upcomingSorted[0];
+          const nextDt = new Date(nextExam.start);
+          const diffMs = nextDt - now;
+          const totalSec = Math.max(0, Math.floor(diffMs / 1000));
+          const days = Math.floor(totalSec / 86400);
+          const hours = Math.floor((totalSec % 86400) / 3600);
+          const minutes = Math.floor((totalSec % 3600) / 60);
+
+          heroEl.classList.remove('hidden');
+          heroEl.innerHTML = `
+            <div class="exam-hero-header">
+              <span class="exam-hero-badge">🎯 Môn thi kế tiếp</span>
+              <span class="priority-pill high">${days === 0 ? '🔥 HÔM NAY' : (days === 1 ? '⚡ NGÀY MAI' : '⏳ CÒN ' + days + ' NGÀY')}</span>
+            </div>
+            <div class="exam-hero-title">${nextExam.title}</div>
+            <div class="exam-timer-grid">
+              <div class="timer-unit">
+                <div class="timer-unit-num">${String(days).padStart(2, '0')}</div>
+                <div class="timer-unit-label">Ngày</div>
+              </div>
+              <div class="timer-unit">
+                <div class="timer-unit-num">${String(hours).padStart(2, '0')}</div>
+                <div class="timer-unit-label">Giờ</div>
+              </div>
+              <div class="timer-unit">
+                <div class="timer-unit-num">${String(minutes).padStart(2, '0')}</div>
+                <div class="timer-unit-label">Phút</div>
+              </div>
+            </div>
+            <div class="exam-meta-pills">
+              <div class="exam-meta-pill">📅 ${nextDt.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+              <div class="exam-meta-pill">⏰ ${nextDt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
+              <div class="exam-meta-pill">📍 ${nextExam.location}</div>
+            </div>
+          `;
+        } else {
+          heroEl.classList.add('hidden');
+        }
+      }
+
       const filteredExams = appState.includePastExams
         ? (exams || [])
         : (exams || []).filter(e => new Date(e.start) >= now);
@@ -3497,161 +3559,6 @@
       copyLiveFeedUrl();
     }
 
-    // ==========================================
-    // FEEDBACK & AI EVALUATION SYSTEM
-    // ==========================================
-    let currentFeedbackCategory = 'feature';
-
-    function selectFbCategory(cat, el) {
-      currentFeedbackCategory = cat;
-      document.querySelectorAll('#feedbackCategoryGroup .fb-cat-btn').forEach(b => b.classList.remove('active'));
-      if (el) el.classList.add('active');
-    }
-
-    async function handleFeedbackSubmit(e) {
-      e.preventDefault();
-      const title = document.getElementById('fbInputTitle').value.trim();
-      const content = document.getElementById('fbInputContent').value.trim();
-      const isAnon = document.getElementById('fbInputAnonymous').checked;
-      const btn = document.getElementById('fbSubmitBtn');
-      const banner = document.getElementById('fbAiResultBanner');
-
-      if (!title || !content) return;
-
-      btn.disabled = true;
-      btn.innerHTML = `<span class="spinner"></span> <span>AI đang phân tích & xếp hạng...</span>`;
-      banner.classList.add('hidden');
-
-      try {
-        const res = await apiFetch('/api/feedback/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            category: currentFeedbackCategory,
-            title: title,
-            content: content,
-            is_anonymous: isAnon,
-          })
-        });
-
-        const data = await res.json();
-        if (data.success && data.feedback) {
-          const fb = data.feedback;
-          const ai = fb.ai_evaluation || {};
-          
-          // Display AI evaluation result banner
-          banner.classList.remove('hidden');
-          const badge = document.getElementById('fbAiResultLevelBadge');
-          const lvl = ai.level || 5;
-          badge.textContent = ai.level_label || `Cấp ${lvl}`;
-          const badgeStyle = getLevelBadgeColor(lvl);
-          badge.style.background = badgeStyle.bg;
-          badge.style.color = badgeStyle.color;
-          badge.style.border = `1px solid ${badgeStyle.border}`;
-
-          document.getElementById('fbAiResultSummary').textContent = ai.ai_summary || 'Ý kiến đã được ghi nhận.';
-          document.getElementById('fbAiResultReco').textContent = `Khả thi: ${ai.feasibility || 'Đang xem xét'} • ${ai.ai_recommendation || ''}`;
-
-          // Reset inputs
-          document.getElementById('fbInputTitle').value = '';
-          document.getElementById('fbInputContent').value = '';
-          showBanner('🎉 Gửi góp ý thành công! AI đã tiếp nhận và xếp hạng độ ưu tiên.', 'success');
-          await loadMyFeedbacks();
-        } else {
-          showBanner('Lỗi: ' + (data.message || 'Không thể gửi góp ý'), 'error');
-        }
-      } catch (err) {
-        showBanner('Không thể kết nối đến máy chủ. Bạn thử lại sau nhé.', 'error');
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<span>Gửi góp ý cho AI thẩm định</span> <span>➔</span>`;
-      }
-    }
-
-    function getLevelBadgeColor(lvl) {
-      const colors = {
-        1: { bg: 'rgba(239, 68, 68, 0.25)', color: '#f87171', border: 'rgba(239, 68, 68, 0.4)' },
-        2: { bg: 'rgba(249, 115, 22, 0.22)', color: '#fb923c', border: 'rgba(249, 115, 22, 0.4)' },
-        3: { bg: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: 'rgba(245, 158, 11, 0.35)' },
-        4: { bg: 'rgba(234, 179, 8, 0.18)', color: '#facc15', border: 'rgba(234, 179, 8, 0.35)' },
-        5: { bg: 'rgba(16, 185, 129, 0.18)', color: '#34d399', border: 'rgba(16, 185, 129, 0.35)' },
-        6: { bg: 'rgba(14, 165, 233, 0.18)', color: '#38bdf8', border: 'rgba(14, 165, 233, 0.35)' },
-        7: { bg: 'rgba(168, 85, 247, 0.18)', color: '#c084fc', border: 'rgba(168, 85, 247, 0.35)' },
-        8: { bg: 'rgba(148, 163, 184, 0.18)', color: '#94a3b8', border: 'rgba(148, 163, 184, 0.35)' },
-        9: { bg: 'rgba(120, 113, 108, 0.18)', color: '#a8a29e', border: 'rgba(120, 113, 108, 0.35)' },
-        10: { bg: 'rgba(82, 82, 91, 0.25)', color: '#71717a', border: 'rgba(82, 82, 91, 0.4)' },
-      };
-      return colors[lvl] || colors[5];
-    }
-
-    async function loadMyFeedbacks() {
-      const container = document.getElementById('myFeedbacksContainer');
-      if (!container) return;
-
-      try {
-        const res = await apiFetch('/api/feedback/my');
-        const data = await res.json();
-        if (!data.success || !data.feedbacks || data.feedbacks.length === 0) {
-          container.innerHTML = `
-            <div style="text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 13px;">
-              Chưa có ý kiến nào được gửi. Hãy chia sẻ đóng góp của bạn để hoàn thiện UTECal nhé!
-            </div>
-          `;
-          return;
-        }
-
-        const catIcons = { feature: '🚀 Tính năng', bug: '🐛 Báo lỗi', ui: '🎨 Giao diện', other: '💬 Ý kiến' };
-        const statusMap = {
-          pending: '<span class="badge" style="background: rgba(234, 179, 8, 0.15); color: #facc15;">⏳ Chờ xem xét</span>',
-          reviewed: '<span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8;">👀 Đã ghi nhận</span>',
-          resolved: '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">✅ Đã xử lý</span>',
-          dismissed: '<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8;">Đã lưu trữ</span>',
-        };
-
-        container.innerHTML = data.feedbacks.map(fb => {
-          const ai = fb.ai_evaluation || {};
-          const lvl = ai.level || 5;
-          const badgeStyle = getLevelBadgeColor(lvl);
-          const dt = new Date(fb.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-
-          return `
-            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
-              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
-                <div style="font-weight: 600; font-size: 14px; color: #fff; line-height: 1.4;">${escapeHtml(fb.title)}</div>
-                <span class="badge" style="background: ${badgeStyle.bg}; color: ${badgeStyle.color}; border: 1px solid ${badgeStyle.border}; font-size: 10px; white-space: nowrap;">
-                  Cấp ${lvl}
-                </span>
-              </div>
-              <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">${escapeHtml(fb.content)}</div>
-              
-              <div style="font-size: 11px; padding: 8px 10px; background: rgba(0, 0, 0, 0.25); border-radius: 8px; border-left: 3px solid ${badgeStyle.color};">
-                <div style="color: ${badgeStyle.color}; font-weight: 600; margin-bottom: 2px;">🤖 ${escapeHtml(ai.level_label || `Cấp ${lvl}`)}</div>
-                <div style="color: var(--text-muted);">${escapeHtml(ai.ai_summary || '')}</div>
-              </div>
-
-              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-subtle); margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span>${catIcons[fb.category] || '💬'}</span>
-                  <span>•</span>
-                  <span>${dt}</span>
-                  ${fb.is_anonymous ? '<span>• 🕶️ Ẩn danh</span>' : ''}
-                </div>
-                <div>${statusMap[fb.status] || statusMap.pending}</div>
-              </div>
-
-              ${fb.admin_note ? `
-                <div style="font-size: 11px; padding: 6px 10px; background: rgba(14, 165, 233, 0.08); border-left: 2px solid var(--accent-blue); border-radius: 4px; color: #7dd3fc;">
-                  <strong>Admin phản hồi:</strong> ${escapeHtml(fb.admin_note)}
-                </div>
-              ` : ''}
-            </div>
-          `;
-        }).join('');
-      } catch (err) {
-        container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">Chưa thể tải lịch sử góp ý.</div>`;
-      }
-    }
-
     function showBanner(msg, type = 'success') {
       const successB = document.getElementById('successBanner');
       const errorB = document.getElementById('errorBanner');
@@ -3667,6 +3574,105 @@
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    /* AI Chat Assistant (UTE_Cal) */
+    function toggleAiChatDrawer() {
+      const drawer = document.getElementById('aiChatDrawer');
+      if (!drawer) return;
+      drawer.classList.toggle('hidden');
+      if (!drawer.classList.contains('hidden')) {
+        const inp = document.getElementById('chatDrawerInput');
+        if (inp) inp.focus();
+      }
+    }
+
+    function sendQuickPrompt(promptText) {
+      const inp = document.getElementById('chatDrawerInput');
+      if (inp) {
+        inp.value = promptText;
+        sendChatMessage();
+      }
+    }
+
+    async function sendChatMessage() {
+      const inp = document.getElementById('chatDrawerInput');
+      const messagesContainer = document.getElementById('chatDrawerMessages');
+      if (!inp || !messagesContainer) return;
+
+      const userText = inp.value.trim();
+      if (!userText) return;
+
+      inp.value = '';
+
+      // User bubble
+      const userBubble = document.createElement('div');
+      userBubble.className = 'chat-bubble user';
+      userBubble.textContent = userText;
+      messagesContainer.appendChild(userBubble);
+
+      // Bot thinking bubble
+      const botBubble = document.createElement('div');
+      botBubble.className = 'chat-bubble bot';
+      botBubble.innerHTML = '<span style="opacity: 0.7;">⚡ UTE_Cal đang tra cứu...</span>';
+      messagesContainer.appendChild(botBubble);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      try {
+        const token = localStorage.getItem('hcmute_session_token') || '';
+        const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Session-Token': token
+          },
+          body: JSON.stringify({ message: userText })
+        });
+        const data = await res.json();
+        if (data.reply) {
+          botBubble.innerHTML = data.reply.replace(/\n/g, '<br>');
+        } else {
+          botBubble.innerHTML = 'Xin lỗi bạn, không nhận được phản hồi từ trợ lý.';
+        }
+      } catch (err) {
+        botBubble.innerHTML = 'Lỗi kết nối tới máy chủ. Vui lòng thử lại sau giây lát nhé!';
+      }
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
   </script>
+
+  <!-- Floating AI Assistant UTE_Cal FAB Button -->
+  <button id="fabAiChat" class="fab-chat hidden" onclick="toggleAiChatDrawer()" title="Hỏi trợ lý UTE_Cal">
+    <span style="font-size: 16px;">🤖</span>
+    <span>Hỏi UTE_Cal</span>
+  </button>
+
+  <!-- Floating AI Assistant Drawer -->
+  <div id="aiChatDrawer" class="ai-chat-drawer hidden">
+    <div class="chat-drawer-header">
+      <div class="chat-drawer-title">
+        <span>🤖</span>
+        <span>Trợ lý UTE_Cal</span>
+        <span style="font-size: 10px; background: rgba(14, 165, 233, 0.2); color: var(--accent-blue); padding: 2px 7px; border-radius: 10px; font-weight: 600;">Groq LPU</span>
+      </div>
+      <button onclick="toggleAiChatDrawer()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px;">✕</button>
+    </div>
+    <div id="chatDrawerMessages" class="chat-drawer-messages">
+      <div class="chat-bubble bot">
+        👋 Xin chào! Mình là <b>UTE_Cal</b>, trợ lý học tập HCMUTE của bạn. Bạn muốn hỏi về lịch học, ngày thi, phòng học hay điều gì nè?
+      </div>
+    </div>
+    <div class="chat-quick-prompts">
+      <div class="chat-prompt-pill" onclick="sendQuickPrompt('Hôm nay tôi có học môn gì không?')">📅 Hôm nay học gì?</div>
+      <div class="chat-prompt-pill" onclick="sendQuickPrompt('Môn thi tiếp theo là gì, ở phòng nào?')">🎯 Môn thi kế tiếp?</div>
+      <div class="chat-prompt-pill" onclick="sendQuickPrompt('Tuần này có môn nào nghỉ không?')">🔍 Môn nghỉ tuần này?</div>
+      <div class="chat-prompt-pill" onclick="sendQuickPrompt('Cách tính điểm rèn luyện HCMUTE?')">📜 Điểm rèn luyện?</div>
+    </div>
+    <div class="chat-drawer-input-row">
+      <input type="text" id="chatDrawerInput" class="input-control" placeholder="Hỏi UTE_Cal bất cứ điều gì..." style="font-size: 12.5px; padding: 8px 12px;" onkeydown="if(event.key==='Enter') sendChatMessage()">
+      <button class="btn-primary" style="padding: 8px 14px; font-size: 13px;" onclick="sendChatMessage()">
+        Gửi
+      </button>
+    </div>
+  </div>
 </body>
 </html>

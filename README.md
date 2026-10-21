@@ -58,10 +58,6 @@
   - 📜 Hạn nộp chứng chỉ Tiếng Anh / Tin học chuẩn đầu ra.
   - ✍️ Khảo sát đánh giá môn học & Đăng ký môn học.
 
-### 5. 💡 Hòm Thư Gợi Ý & Hệ Thống AI Đánh Giá (Feedback)
-- Sinh viên có thể gửi ý kiến, đề xuất tính năng mới hoặc phản hồi trực tiếp trên tab **Gợi ý**.
-- Hệ thống hỗ trợ đánh giá, phân loại mức độ cần thiết của đóng góp để hoàn thiện ứng dụng ngày một tốt hơn.
-
 ---
 
 ## 🚀 Hướng Dẫn Chạy Cục Bộ (Localhost)
@@ -162,14 +158,12 @@ CalendarGetting/ (UTECal)
 │   ├── conversational_ai.py # Bộ não AI xử lý ngôn ngữ tự nhiên tiếng Việt & Gemini
 │   ├── telegram_bot.py      # Dịch vụ thông báo và tương tác qua Telegram Bot
 │   ├── notice_analyzer.py   # Bộ phân tích thông báo và nhắc hạn chót (Consideration)
-│   ├── feedback_manager.py  # Bộ xử lý và phân loại ý kiến đóng góp sinh viên
 │   ├── ics_exporter.py      # Bộ tạo file lịch chuẩn Apple/Google Calendar (RFC-5545)
 │   └── web_server.py        # Máy chủ REST API xây dựng trên Flask
 ├── config/
 │   └── config.json          # Cấu hình hệ thống (không chứa mật khẩu hay thông tin nhạy cảm)
 ├── tests/
 │   ├── test_components.py   # Kiểm thử các thành phần hệ thống
-│   ├── test_feedback.py     # Kiểm thử luồng tiếp nhận gợi ý
 │   └── test_sessions.py     # Kiểm thử cơ chế bảo mật phiên
 ├── requirements.txt         # Danh mục thư viện Python cần thiết
 ├── start.bat                # Khởi động nhanh 1-click cho người dùng Windows

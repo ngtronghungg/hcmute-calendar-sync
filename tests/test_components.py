@@ -125,6 +125,23 @@ class TestNoticeAnalyzer(unittest.TestCase):
         result = export_events_to_ics([ev], output_path=ics_path)
         self.assertTrue(result.endswith(".ics"))
 
+    def test_health_check_endpoint(self):
+        from src.web_server import app
+        with app.test_client() as client:
+            res = client.get("/health")
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertEqual(data.get("status"), "healthy")
+            self.assertEqual(data.get("service"), "UTE_Cal")
+
+    def test_ai_chat_endpoint_empty_message(self):
+        from src.web_server import app
+        with app.test_client() as client:
+            res = client.post("/api/ai/chat", json={"message": ""})
+            self.assertEqual(res.status_code, 400)
+            data = res.get_json()
+            self.assertFalse(data.get("success"))
+
 
 if __name__ == "__main__":
     unittest.main()
