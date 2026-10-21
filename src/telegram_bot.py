@@ -3,18 +3,19 @@ HCMUTE Telegram Bot Service
 Lightweight student assistant for Telegram notifications:
 - Morning briefings (daily class & exam summary)
 - Auto-alert on schedule changes (diff detection: cancellations & make-up classes)
-- Interactive bot commands: /today, /tkb, /thi, /nhacnho, /nghi
-Zero heavy dependencies, runs with minimal RAM (~5MB).
+- Interactive bot commands: /today, /tkb, /thi, /nhacnho, /nghi, /me, /mssv
+- High performance: Instant response via disk-cached events, non-blocking threading
 """
 
 import os
 import sys
 import json
 import time
+import re
 import threading
 import requests
-from datetime import datetime, date, timedelta
-from typing import Optional, Dict, Any, List
+from datetime import datetime, date, timedelta, timezone
+from typing import Optional, Dict, Any, List, Tuple
 
 if sys.platform == "win32":
     try:
@@ -30,6 +31,12 @@ if PROJECT_ROOT not in sys.path:
 
 from src.hcmute_api import HCMUTEClient
 from src.schedule_parser import parse_semester_schedule, parse_exam_schedule, CalendarEvent
+from src.schedule_cache import (
+    load_feed_cache,
+    save_feed_cache,
+    load_cached_exams,
+    save_cached_exams,
+)
 from src.notice_analyzer import NoticeAnalyzer
 
 CONFIG_PATH = os.path.join(PROJECT_ROOT, "config", "config.json")
@@ -37,6 +44,130 @@ SNAPSHOT_PATH = os.path.join(PROJECT_ROOT, "data", ".schedule_snapshot.json")
 CANCELLATIONS_PATH = os.path.join(PROJECT_ROOT, "data", ".manual_cancellations.json")
 TELEGRAM_USERS_PATH = os.path.join(PROJECT_ROOT, "data", "telegram_users.json")
 CANCELLATION_VOTES_PATH = os.path.join(PROJECT_ROOT, "data", ".cancellation_votes.json")
+MAKEUP_CLASSES_PATH = os.path.join(PROJECT_ROOT, "data", ".makeup_classes.json")
+OFFSET_FILE = os.path.join(PROJECT_ROOT, "data", ".tg_update_offset.txt")
+BRIEFING_SENT_FILE = os.path.join(PROJECT_ROOT, "data", ".last_briefing_date.txt")
+STUDENT_ACCESS_LOG = os.path.join(PROJECT_ROOT, "data", "student_access_log.json")
+
+# Standard Vietnam Timezone (UTC+7 / ICT / Asia/Ho_Chi_Minh)
+VIETNAM_TZ = timezone(timedelta(hours=7))
+
+def get_vietnam_now() -> datetime:
+    """Return current datetime strictly in Vietnam Timezone (UTC+7)."""
+    return datetime.now(timezone.utc).astimezone(VIETNAM_TZ).replace(tzinfo=None)
+
+_processed_update_ids = set()
+
+def load_last_offset() -> int:
+    if os.path.exists(OFFSET_FILE):
+        try:
+            with open(OFFSET_FILE, "r", encoding="utf-8") as f:
+                return int(f.read().strip())
+        except Exception:
+            pass
+    return 0
+
+def save_last_offset(offset: int) -> None:
+    try:
+        os.makedirs(os.path.dirname(OFFSET_FILE), exist_ok=True)
+        with open(OFFSET_FILE, "w", encoding="utf-8") as f:
+            f.write(str(offset))
+    except Exception:
+        pass
+
+def load_last_briefing_date() -> str:
+    if os.path.exists(BRIEFING_SENT_FILE):
+        try:
+            with open(BRIEFING_SENT_FILE, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+    return ""
+
+def save_last_briefing_date(date_str: str) -> None:
+    try:
+        os.makedirs(os.path.dirname(BRIEFING_SENT_FILE), exist_ok=True)
+        with open(BRIEFING_SENT_FILE, "w", encoding="utf-8") as f:
+            f.write(date_str)
+    except Exception:
+        pass
+
+def record_student_access(mssv: str, name: str = "", channel: str = "Web Portal") -> None:
+    if not mssv:
+        return
+    try:
+        os.makedirs(os.path.dirname(STUDENT_ACCESS_LOG), exist_ok=True)
+        db = {}
+        if os.path.exists(STUDENT_ACCESS_LOG):
+            try:
+                with open(STUDENT_ACCESS_LOG, "r", encoding="utf-8") as f:
+                    db = json.load(f)
+            except Exception:
+                db = {}
+        key = str(mssv).strip()
+        existing = db.get(key, {})
+        channels = set(existing.get("channel", "").split(" & ")) if existing.get("channel") else set()
+        channels.add(channel)
+        clean_channels = " & ".join(filter(None, channels))
+        now_str = get_vietnam_now().strftime("%d/%m/%Y %H:%M")
+
+        db[key] = {
+            "mssv": key,
+            "name": name or existing.get("name") or "Sinh viên",
+            "channel": clean_channels,
+            "first_seen": existing.get("first_seen") or now_str,
+            "last_seen": now_str,
+            "access_count": existing.get("access_count", 0) + 1,
+        }
+        with open(STUDENT_ACCESS_LOG, "w", encoding="utf-8") as f:
+            json.dump(db, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+def load_student_access() -> list:
+    results = []
+    if os.path.exists(STUDENT_ACCESS_LOG):
+        try:
+            with open(STUDENT_ACCESS_LOG, "r", encoding="utf-8") as f:
+                db = json.load(f)
+                results.extend(db.values())
+        except Exception:
+            pass
+    tg_users = load_telegram_users()
+    existing_mssvs = {str(r["mssv"]).strip() for r in results if r.get("mssv")}
+    for u in tg_users.values():
+        u_mssv = str(u.get("mssv", "")).strip()
+        if u_mssv and u_mssv not in existing_mssvs:
+            results.append({
+                "mssv": u_mssv,
+                "name": u.get("name", "Sinh viên"),
+                "channel": "Telegram Bot",
+                "first_seen": u.get("registered_at", ""),
+                "last_seen": u.get("last_active", ""),
+                "access_count": 1,
+                "chat_id": u.get("chat_id"),
+            })
+            existing_mssvs.add(u_mssv)
+    # Sort by last_seen descending
+    results.sort(key=lambda x: x.get("last_seen", ""), reverse=True)
+    return results
+
+
+def delete_student_access(mssv: str) -> bool:
+    """Delete a student access record by MSSV."""
+    try:
+        key = str(mssv).strip()
+        if os.path.exists(STUDENT_ACCESS_LOG):
+            with open(STUDENT_ACCESS_LOG, "r", encoding="utf-8") as f:
+                db = json.load(f)
+            if key in db:
+                del db[key]
+                with open(STUDENT_ACCESS_LOG, "w", encoding="utf-8") as f:
+                    json.dump(db, f, ensure_ascii=False, indent=2)
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def load_telegram_users() -> Dict[str, dict]:
@@ -61,6 +192,48 @@ def save_telegram_users(users: Dict[str, dict]) -> bool:
         return False
 
 
+def get_student_identity(chat_id: Optional[str] = None, client: Optional[HCMUTEClient] = None) -> Tuple[str, str]:
+    """
+    Return (student_name, student_mssv).
+    Intelligently checks Telegram users DB, active session cache, and client object.
+    """
+    name, mssv = "Sinh viên HCMUTE", ""
+
+    # 1. Look up Telegram user registry
+    if chat_id:
+        users = load_telegram_users()
+        u = users.get(str(chat_id).strip(), {})
+        if u.get("name") and u.get("name") != "Sinh viên":
+            name = u["name"]
+        if u.get("mssv"):
+            mssv = str(u["mssv"])
+
+    # 2. Look up saved token cache (.token_cache.json)
+    if not mssv or name == "Sinh viên HCMUTE":
+        try:
+            token_path = os.path.join(PROJECT_ROOT, "data", ".token_cache.json")
+            if os.path.exists(token_path):
+                with open(token_path, "r", encoding="utf-8") as tf:
+                    tdata = json.load(tf)
+                    if not mssv and tdata.get("Id"):
+                        mssv = str(tdata.get("Id"))
+                    if (not name or name == "Sinh viên HCMUTE") and tdata.get("FullName"):
+                        name = tdata.get("FullName")
+        except Exception:
+            pass
+
+    # 3. Look up live client session
+    if client and client.session_data:
+        if not mssv and client.session_data.get("Id"):
+            mssv = str(client.session_data.get("Id"))
+        if not name or name == "Sinh viên HCMUTE":
+            c_name = client.session_data.get("DisplayName") or client.session_data.get("FullName") or client.session_data.get("Username")
+            if c_name:
+                name = c_name
+
+    return name, mssv
+
+
 def register_or_update_telegram_user(
     chat_id: str,
     mssv: str = "",
@@ -77,13 +250,25 @@ def register_or_update_telegram_user(
         return {}
 
     existing = users.get(chat_key, {})
+    curr_mssv = mssv or existing.get("mssv", "")
+    curr_name = name or existing.get("name", "")
+
+    # Auto-link MSSV from .token_cache.json if empty
+    if not curr_mssv or not curr_name or curr_name == "Sinh viên":
+        default_name, default_mssv = get_student_identity()
+        if not curr_mssv and default_mssv:
+            curr_mssv = default_mssv
+        if (not curr_name or curr_name == "Sinh viên") and default_name and default_name != "Sinh viên HCMUTE":
+            curr_name = default_name
+
+    vn_now_str = get_vietnam_now().strftime("%d/%m/%Y %H:%M")
     user_record = {
         "chat_id": chat_key,
-        "mssv": mssv or existing.get("mssv", ""),
-        "name": name or existing.get("name", "Sinh viên"),
+        "mssv": curr_mssv,
+        "name": curr_name or "Sinh viên",
         "username": username or existing.get("username", ""),
-        "registered_at": existing.get("registered_at") or datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "last_active": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "registered_at": existing.get("registered_at") or vn_now_str,
+        "last_active": vn_now_str,
         "active": True,
         "morning_briefing": morning_briefing,
         "diff_alert": diff_alert,
@@ -91,6 +276,8 @@ def register_or_update_telegram_user(
     }
     users[chat_key] = user_record
     save_telegram_users(users)
+    if curr_mssv:
+        record_student_access(curr_mssv, curr_name or "Sinh viên", channel="Telegram Bot")
     return user_record
 
 
@@ -252,7 +439,7 @@ def save_cancellation_votes(votes: dict) -> bool:
             json.dump(votes, f, ensure_ascii=False, indent=2)
         return True
     except Exception:
-        return False
+        pass
 
 
 def record_cancellation_vote(
@@ -264,11 +451,7 @@ def record_cancellation_vote(
 ) -> dict:
     """
     Crowdsourced Class Cancellation Voting Engine:
-    Tracks student votes when a lecturer announces an unexpected cancellation on Zalo.
-    When the threshold (default 80%) is reached:
-    - Automatically confirms cancellation system-wide in .manual_cancellations.json
-    - Automatically removes class from Google Calendar and iCal feeds for everyone
-    - Broadcasts an alert to all registered students
+    When threshold is reached, automatically marks class cancelled system-wide.
     """
     import math
     cfg = load_config()
@@ -283,15 +466,11 @@ def record_cancellation_vote(
     needed_votes = max(1, math.ceil(total_students * (threshold_percent / 100.0)))
 
     if not course_title:
-        try:
-            from src.web_server import load_feed_cache
-            for ev in load_feed_cache():
-                if ev.uid == class_uid:
-                    course_title = ev.title
-                    time_str = f"{ev.start_datetime.strftime('%H:%M')} ngày {ev.start_datetime.strftime('%d/%m/%Y')}"
-                    break
-        except Exception:
-            pass
+        for ev in load_feed_cache():
+            if ev.uid == class_uid:
+                course_title = ev.title
+                time_str = f"{ev.start_datetime.strftime('%H:%M')} ngày {ev.start_datetime.strftime('%d/%m/%Y')}"
+                break
     if not course_title:
         course_title = "Buổi học"
 
@@ -317,7 +496,7 @@ def record_cancellation_vote(
 
     if not enabled or current_votes >= needed_votes:
         entry["confirmed"] = True
-        entry["confirmed_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
+        entry["confirmed_at"] = get_vietnam_now().strftime("%d/%m/%Y %H:%M")
         add_cancellation(class_uid)
         just_confirmed = not was_confirmed
 
@@ -331,7 +510,7 @@ def record_cancellation_vote(
             f"🚨 <b>XÁC NHẬN NGHỈ HỌC CỘNG ĐỒNG (ZALO BÁO NGHỈ)</b>\n\n"
             f"📚 Môn học: <b>{course_title}</b>\n"
             f"⏰ Thời gian: <b>{time_str}</b>\n\n"
-            f"⚡ <i>Đã có {current_votes}/{total_students} sinh viên ({percent:.0f}%) đồng loạt báo nghỉ học (từ Zalo lớp).</i>\n\n"
+            f"⚡ <i>Đã có {current_votes}/{total_students} sinh viên ({percent:.0f}%) đồng loạt báo nghỉ học.</i>\n\n"
             f"✔ Hệ thống đã tự động xác nhận và <b>xóa buổi học này khỏi Google Calendar</b> của toàn bộ sinh viên!"
         )
         for chat_id, u in users.items():
@@ -391,9 +570,6 @@ def remove_cancellation_vote(class_uid: str, voter_id: str, bot_token: Optional[
     return {"status": "unvoted", "current_votes": len(entry["voters"])}
 
 
-MAKEUP_CLASSES_PATH = os.path.join(PROJECT_ROOT, "data", ".makeup_classes.json")
-
-
 def load_makeup_classes() -> List[CalendarEvent]:
     """Load manually added or portal-detected make-up classes."""
     if os.path.exists(MAKEUP_CLASSES_PATH):
@@ -445,6 +621,8 @@ def add_makeup_class(title: str, start_dt: datetime, end_dt: datetime, location:
     events = [e for e in events if e.uid != uid]
     events.append(ev)
     save_makeup_classes(events)
+    # Also merge into feed cache
+    save_feed_cache([ev])
     return ev
 
 
@@ -464,7 +642,7 @@ def send_telegram_message(
     reply_markup: Optional[Dict[str, Any]] = None,
     parse_mode: str = "HTML",
 ) -> bool:
-    """Send a message via Telegram Bot API using pure requests."""
+    """Send a message via Telegram Bot API with quick 5s timeout."""
     if not bot_token or not chat_id:
         return False
 
@@ -479,65 +657,60 @@ def send_telegram_message(
         payload["reply_markup"] = reply_markup
 
     try:
-        resp = requests.post(url, json=payload, timeout=10)
+        resp = requests.post(url, json=payload, timeout=5)
         return resp.status_code == 200
     except Exception as e:
         print(f"[Telegram] Send message error: {e}")
         return False
 
 
-def get_cached_telegram_exams() -> list:
-    """Load cached exams from disk."""
-    for p in ("data/exam_cache.json", "data/calendar_feed_cache.json"):
-        if os.path.exists(p):
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    raw = json.load(f)
-                return [CalendarEvent.from_dict(d) for d in raw if d.get("event_type") in ("EXAM", "THI") or "THI" in d.get("title", "")]
-            except Exception:
-                pass
-    return []
+MAIN_INLINE_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "📅 Lịch hôm nay", "callback_data": "action_today"},
+            {"text": "📚 5 buổi học tới", "callback_data": "action_tkb"},
+        ],
+        [
+            {"text": "🎯 Lịch thi", "callback_data": "action_thi"},
+            {"text": "❌ Báo nghỉ môn", "callback_data": "action_nghi"},
+        ],
+        [
+            {"text": "👤 Hồ sơ MSSV", "callback_data": "action_me"},
+            {"text": "🔄 Đồng bộ realtime", "callback_data": "action_sync"},
+        ],
+    ]
+}
 
 
-def format_today_schedule(client: HCMUTEClient) -> str:
-    """Generate summary of today's classes, exams, and urgent deadlines."""
-    now = datetime.now()
+def format_today_schedule(client: HCMUTEClient, chat_id: Optional[str] = None) -> str:
+    """Generate summary of today's classes and upcoming exams instantly from local cache."""
+    now = get_vietnam_now()
     today = now.date()
     today_str = today.strftime("%d/%m/%Y")
 
     weekday_names = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
     day_name = weekday_names[today.weekday()]
 
-    # 1. Classes
-    today_classes = []
-    if client.ensure_authenticated():
-        try:
-            yt = client.get_year_and_term()
-            curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or "2026-2027"
-            curr_term = yt.get("CurrentTerm") or yt.get("HocKyHienTai") or "HK01"
+    student_name, student_mssv = get_student_identity(chat_id, client)
+    all_events = load_feed_cache()
+    cancelled_set = load_cancellations()
 
-            raw_sched = client.get_schedule_semester(curr_year, curr_term)
-            classes = parse_semester_schedule(raw_sched)
+    # 1. Today Classes from cache
+    today_classes = [
+        c for c in all_events
+        if (c.event_type or "").upper() in ("CLASS", "TKB")
+        and c.start_datetime.date() == today
+        and c.uid not in cancelled_set
+    ]
+    today_classes.sort(key=lambda x: x.start_datetime)
 
-            cancelled_set = load_cancellations()
-            today_classes = [
-                c for c in classes
-                if c.start_datetime.date() == today and c.uid not in cancelled_set
-            ]
-            today_classes.sort(key=lambda x: x.start_datetime)
-        except Exception:
-            pass
-
-    # 2. Exams in next 7 days
-    raw_exams = []
-    if client.ensure_authenticated():
-        try:
-            raw_exams.extend(client.get_exams_by_time())
-        except Exception:
-            pass
-    exams = parse_exam_schedule(raw_exams)
+    # 2. Upcoming exams within next 7 days
+    exams = [
+        e for e in all_events
+        if (e.event_type or "").upper() in ("EXAM", "THI") or "THI" in (e.title or "").upper()
+    ]
     if not exams:
-        exams = get_cached_telegram_exams()
+        exams = load_cached_exams()
 
     upcoming_exams = [
         e for e in exams
@@ -545,13 +718,9 @@ def format_today_schedule(client: HCMUTEClient) -> str:
     ]
     upcoming_exams.sort(key=lambda x: x.start_datetime)
 
-    student_name = "HCMUTE"
-    if client.session_data:
-        student_name = client.session_data.get("DisplayName") or client.session_data.get("FullName") or client.session_data.get("Username", "HCMUTE")
-
     lines = [
         f"📅 <b>LỊCH HỌC & THI HÔM NAY ({day_name}, {today_str})</b>",
-        f"👤 Sinh viên: <b>{student_name}</b>\n",
+        f"👤 Sinh viên: <b>{student_name}</b>" + (f" | 🎓 MSSV: <code>{student_mssv}</code>" if student_mssv else "") + "\n",
     ]
 
     if today_classes:
@@ -575,24 +744,21 @@ def format_today_schedule(client: HCMUTEClient) -> str:
     return "\n".join(lines)
 
 
-def format_upcoming_exams(client: HCMUTEClient) -> str:
-    """Generate upcoming exam schedule with disk cache fallback."""
-    exams = []
-    if client.ensure_authenticated():
-        raw_exams = []
-        try:
-            raw_exams.extend(client.get_exams_by_time())
-        except Exception:
-            pass
-        exams = parse_exam_schedule(raw_exams)
-
+def format_upcoming_exams(client: HCMUTEClient, chat_id: Optional[str] = None) -> str:
+    """Generate upcoming exam schedule instantly from cache."""
+    all_events = load_feed_cache()
+    exams = [
+        e for e in all_events
+        if (e.event_type or "").upper() in ("EXAM", "THI") or "THI" in (e.title or "").upper()
+    ]
     if not exams:
-        exams = get_cached_telegram_exams()
+        exams = load_cached_exams()
 
-    now = datetime.now()
-    # Keep exams in the last 7 days + upcoming so current exam period is clearly displayed
+    now = get_vietnam_now()
     upcoming = [e for e in exams if e.start_datetime >= now - timedelta(days=7)]
     upcoming.sort(key=lambda x: x.start_datetime)
+
+    student_name, student_mssv = get_student_identity(chat_id, client)
 
     if not upcoming:
         if exams:
@@ -604,7 +770,13 @@ def format_upcoming_exams(client: HCMUTEClient) -> str:
             return "\n".join(lines)
         return "📝 <b>Hiện không có lịch thi kết thúc học phần sắp tới.</b>"
 
-    lines = [f"📝 <b>LỊCH THI KẾT THÚC HỌC PHẦN ({len(upcoming)} môn trong đợt này)</b>\n"]
+    header = f"📝 <b>LỊCH THI KẾT THÚC HỌC PHẦN ({len(upcoming)} môn trong đợt này)</b>"
+    if student_mssv:
+        header += f"\n👤 <b>{student_name}</b> (MSSV: <code>{student_mssv}</code>)\n"
+    else:
+        header += "\n"
+
+    lines = [header]
     for ex in upcoming:
         diff = (ex.start_datetime.date() - now.date()).days
         if diff < 0:
@@ -626,15 +798,73 @@ def format_upcoming_exams(client: HCMUTEClient) -> str:
     return "\n".join(lines)
 
 
+def format_upcoming_classes(client: HCMUTEClient, limit: int = 5, chat_id: Optional[str] = None) -> str:
+    """Format the next upcoming classes for students."""
+    now = get_vietnam_now()
+    all_events = load_feed_cache()
+    cancelled_set = load_cancellations()
+
+    valid_classes = [
+        c for c in all_events
+        if (c.event_type or "").upper() in ("CLASS", "TKB")
+        and c.uid not in cancelled_set
+        and c.end_datetime >= now
+    ]
+    valid_classes.sort(key=lambda x: x.start_datetime)
+
+    if not valid_classes:
+        return "🏖️ <b>Bạn không còn buổi học nào trong kỳ này.</b>"
+
+    student_name, student_mssv = get_student_identity(chat_id, client)
+    header = f"📚 <b>{min(limit, len(valid_classes))} BUỔI HỌC SẮP TỚI:</b>"
+    if student_mssv:
+        header += f"\n👤 <b>{student_name}</b> (MSSV: <code>{student_mssv}</code>)\n"
+    else:
+        header += "\n"
+
+    lines = [header]
+    for c in valid_classes[:limit]:
+        day_str = c.start_datetime.strftime("%d/%m/%Y")
+        time_str = f"{c.start_datetime.strftime('%H:%M')} - {c.end_datetime.strftime('%H:%M')}"
+        room = c.location.split(",")[0] if c.location else "HCMUTE"
+        diff = (c.start_datetime.date() - now.date()).days
+        countdown = "Hôm nay" if diff == 0 else (f"Còn {diff} ngày" if diff > 0 else "")
+        badge = f" ({countdown})" if countdown else ""
+        lines.append(f"• <b>{c.title}</b>{badge}")
+        lines.append(f"  📅 {day_str} | ⏰ {time_str} | 📍 {room}\n")
+    return "\n".join(lines)
+
+
+def format_student_info(chat_id: str, client: HCMUTEClient) -> str:
+    """Format student profile and active notification settings."""
+    student_name, student_mssv = get_student_identity(chat_id, client)
+    users = load_telegram_users()
+    u = users.get(str(chat_id), {})
+
+    lines = [
+        "👤 <b>HỒ SƠ SINH VIÊN & TRẠNG THÁI TRỢ LÝ:</b>\n",
+        f"• Họ và tên: <b>{student_name}</b>",
+        f"• MSSV: <code>{student_mssv or 'Chưa cập nhật'}</code>",
+        f"• Telegram Chat ID: <code>{chat_id}</code>",
+        f"• Username: <b>@{u.get('username') or 'N/A'}</b>",
+        f"• Ngày kết nối: <b>{u.get('registered_at', 'Hôm nay')}</b>\n",
+        "⚙️ <b>Cấu hình thông báo tự động:</b>",
+        f"• ☀️ Bản tin sáng 06:30: {'✅ BẬT' if u.get('morning_briefing', True) else '❌ TẮT'}",
+        f"• ⚠️ Báo nghỉ / Học bù: {'✅ BẬT' if u.get('diff_alert', True) else '❌ TẮT'}",
+        f"• 🔥 Cảnh báo lịch thi: {'✅ BẬT' if u.get('exam_alert', True) else '❌ TẮT'}\n",
+        "💡 <i>Bạn có thể gửi tin nhắn chứa mã số sinh viên (ví dụ: <code>24144177</code>) để cập nhật MSSV bất cứ lúc nào!</i>",
+    ]
+    return "\n".join(lines)
+
+
 def format_reminders(client: HCMUTEClient) -> str:
     """Generate summary of active deadlines & portal notices."""
     if not client.ensure_authenticated():
-        return "⚠️ Chưa đăng nhập tài khoản HCMUTE."
+        return "⚠️ Chưa có phiên đăng nhập Cổng trường HCMUTE. Hãy dùng /today hoặc /thi để xem lịch đã lưu."
 
     analyzer = NoticeAnalyzer(load_config())
     raw_notices = client.get_personal_messages()[:15] + client.get_general_announcements()[:20]
 
-    # Decrypt personal notice bodies
     for p in raw_notices:
         mid = p.get("MessageID") or p.get("Id")
         if mid and "MessageBody" not in p:
@@ -652,7 +882,7 @@ def format_reminders(client: HCMUTEClient) -> str:
     except Exception:
         pass
 
-    now = datetime.now()
+    now = get_vietnam_now()
     future_items = [it for it in items if it.deadline and it.deadline >= now - timedelta(days=1)]
     future_items.sort(key=lambda x: x.deadline)
 
@@ -683,15 +913,12 @@ LAST_SYNC_TIMESTAMP = 0
 def auto_sync_and_detect_changes(client: HCMUTEClient, bot_token: Optional[str] = None, force: bool = False) -> dict:
     """
     Perform a complete real-time sync with HCMUTE portal:
-    1. Silently re-authenticate if token expired (using saved vault).
-    2. Check for removed classes (Báo nghỉ) and auto-cancel them.
-    3. Check for added classes (Lịch học bù) and include them.
-    4. Check for notices mentioning cancellations/make-up classes.
-    5. Push instant Telegram notifications to all registered students.
-    6. Update calendar cache so Google Calendar feeds reflect changes immediately.
+    1. Checks for removed classes (Báo nghỉ) and auto-cancels them.
+    2. Checks for added classes (Lịch học bù) and includes them.
+    3. Pushes instant Telegram notifications.
+    4. Updates calendar cache.
     """
     global LAST_SYNC_TIMESTAMP
-    import time
     now_ts = time.time()
     if not force and (now_ts - LAST_SYNC_TIMESTAMP < 300):
         return {"status": "skipped", "message": "Recently synced within 5 mins"}
@@ -703,7 +930,7 @@ def auto_sync_and_detect_changes(client: HCMUTEClient, bot_token: Optional[str] 
     results = {"cancelled_count": 0, "makeup_count": 0, "messages_sent": 0}
 
     try:
-        now = datetime.now()
+        now = get_vietnam_now()
         yt = client.get_year_and_term()
         curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or "2026-2027"
         curr_term = yt.get("CurrentTerm") or yt.get("HocKyHienTai") or "HK01"
@@ -711,7 +938,10 @@ def auto_sync_and_detect_changes(client: HCMUTEClient, bot_token: Optional[str] 
         raw_sched = client.get_schedule_semester(curr_year, curr_term)
         current_classes = parse_semester_schedule(raw_sched)
 
-        # Lookahead 30 days
+        # Safeguard: Never trigger mass cancellations if portal returns empty/corrupt data
+        if not current_classes or len(current_classes) < 2:
+            return {"status": "skipped", "message": "Dữ liệu môn học từ cổng trường chưa sẵn sàng để so sánh diff."}
+
         upcoming_curr = {
             c.uid: {
                 "title": c.title,
@@ -739,7 +969,7 @@ def auto_sync_and_detect_changes(client: HCMUTEClient, bot_token: Optional[str] 
         users = load_telegram_users()
 
         if old_snapshot:
-            # 1. Classes that disappeared from the portal (BÁO NGHỈ)
+            # Removed classes (Báo nghỉ)
             removed_uids = [uid for uid in old_snapshot if uid not in upcoming_curr]
             for uid in removed_uids:
                 info = old_snapshot[uid]
@@ -764,7 +994,7 @@ def auto_sync_and_detect_changes(client: HCMUTEClient, bot_token: Optional[str] 
                             send_telegram_message(token_to_use, uid_chat, alert_text)
                             results["messages_sent"] += 1
 
-            # 2. Classes that were newly added on the portal (LỊCH HỌC BÙ)
+            # Added classes (Lịch học bù)
             added_uids = [uid for uid in upcoming_curr if uid not in old_snapshot]
             for uid in added_uids:
                 info = upcoming_curr[uid]
@@ -794,8 +1024,7 @@ def auto_sync_and_detect_changes(client: HCMUTEClient, bot_token: Optional[str] 
         with open(SNAPSHOT_PATH, "w", encoding="utf-8") as f:
             json.dump(upcoming_curr, f, ensure_ascii=False, indent=2)
 
-        # Update calendar feed cache (merging makeup classes)
-        from src.web_server import save_feed_cache, load_cached_exams
+        # Update calendar feed cache
         all_events_to_cache = list(current_classes)
         all_events_to_cache.extend(load_cached_exams())
         all_events_to_cache.extend(load_makeup_classes())
@@ -809,31 +1038,58 @@ def auto_sync_and_detect_changes(client: HCMUTEClient, bot_token: Optional[str] 
     return results
 
 
-def check_schedule_changes(client: HCMUTEClient, bot_token: str, chat_id: str) -> None:
-    """Backwards compatibility alias."""
-    auto_sync_and_detect_changes(client, bot_token=bot_token, force=True)
+def trigger_morning_briefing(client: HCMUTEClient, bot_token: Optional[str] = None) -> dict:
+    """Send morning briefing to all registered active users."""
+    if not bot_token:
+        cfg = load_config().get("telegram", {})
+        bot_token = cfg.get("bot_token", "").strip()
+    if not bot_token:
+        return {"total": 0, "sent": 0, "errors": 0, "message": "Bot token not configured"}
+
+    users = load_telegram_users()
+    sent, errors = 0, 0
+    for chat_id, u in users.items():
+        if u.get("active", True) and u.get("morning_briefing", True):
+            user_briefing = format_today_schedule(client, chat_id=chat_id)
+            formatted = f"🌅 <b>BẢN TIN BUỔI SÁNG HCMUTE</b>\n\n{user_briefing}"
+            if send_telegram_message(bot_token, chat_id, formatted, reply_markup=MAIN_INLINE_KEYBOARD):
+                sent += 1
+            else:
+                errors += 1
+    return {"total": len(users), "sent": sent, "errors": errors}
+
+
+_daemon_lock = threading.Lock()
+_global_daemon_instance: Optional["TelegramBotDaemon"] = None
+
+
+def get_or_create_bot_daemon(get_client_func) -> "TelegramBotDaemon":
+    """Singleton factory ensuring only ONE Telegram polling daemon ever runs."""
+    global _global_daemon_instance
+    with _daemon_lock:
+        if _global_daemon_instance is None:
+            _global_daemon_instance = TelegramBotDaemon(get_client_func)
+        return _global_daemon_instance
 
 
 class TelegramBotDaemon:
-    """Lightweight background thread handling Telegram commands & periodic checks."""
+    """High-performance, non-blocking background daemon for Telegram polling and daily notifications."""
 
     def __init__(self, get_client_func):
         self.get_client = get_client_func
         self.running = False
         self.thread: Optional[threading.Thread] = None
-        self.last_update_id = 0
-        self.last_morning_date: Optional[date] = None
+        self.last_update_id = load_last_offset()
+        self.last_morning_date = load_last_briefing_date()
 
     def start(self):
-        if self.running:
-            return
-        self.running = True
-        self.thread = threading.Thread(target=self._run_loop, daemon=True)
-        self.thread.start()
-        try:
-            print("🤖 Telegram Bot Background Service đã khởi động.")
-        except Exception:
-            print("[Telegram Bot] Background Service started.")
+        with _daemon_lock:
+            if self.running:
+                return
+            self.running = True
+            self.thread = threading.Thread(target=self._run_loop, daemon=True, name="HCMUTE_Telegram_Daemon")
+            self.thread.start()
+            print("🤖 Telegram Bot Background Service đã khởi động (Chế độ Realtime Non-blocking).")
 
     def stop(self):
         self.running = False
@@ -845,149 +1101,104 @@ class TelegramBotDaemon:
                 tg_cfg = cfg.get("telegram", {})
                 enabled = tg_cfg.get("enabled", False)
                 bot_token = tg_cfg.get("bot_token", "").strip()
-                chat_id = tg_cfg.get("chat_id", "").strip()
 
                 if not enabled or not bot_token:
-                    time.sleep(10)
+                    time.sleep(5)
                     continue
 
                 client = self.get_client()
 
-                # 1. Process Telegram Updates (Long Polling)
+                # 1. Process Telegram Updates (Long Polling with non-blocking worker threads)
                 self._poll_updates(bot_token, client)
 
-                # 2. Check Morning Briefing for all registered students
-                now = datetime.now()
+                # 2. Check Morning Briefing (Strict Vietnam Timezone UTC+7)
+                now_vn = get_vietnam_now()
                 morning_target = tg_cfg.get("morning_time", "06:30")
                 try:
                     target_h, target_m = map(int, morning_target.split(":"))
                 except Exception:
                     target_h, target_m = 6, 30
 
-                if now.date() != self.last_morning_date:
-                    if (now.hour > target_h) or (now.hour == target_h and now.minute >= target_m):
-                        trigger_morning_briefing(client, bot_token=bot_token)
-                        self.last_morning_date = now.date()
+                today_vn_str = now_vn.strftime("%Y-%m-%d")
+                last_briefing = load_last_briefing_date()
 
-                        # Run diff check once a day after morning briefing
+                if today_vn_str != last_briefing:
+                    # Strict morning window: target_h:target_m to target_h + 2 hours
+                    is_in_window = (
+                        (now_vn.hour == target_h and now_vn.minute >= target_m) or
+                        (now_vn.hour > target_h and now_vn.hour < target_h + 2)
+                    )
+                    if is_in_window:
+                        save_last_briefing_date(today_vn_str)
+                        self.last_morning_date = today_vn_str
+                        trigger_morning_briefing(client, bot_token=bot_token)
                         if tg_cfg.get("diff_alert", True):
                             auto_sync_and_detect_changes(client, bot_token=bot_token)
+                    elif now_vn.hour >= target_h + 2:
+                        # Server was started after morning hours (e.g. afternoon or evening)
+                        # Silently mark today done to completely prevent evening duplicate spam!
+                        save_last_briefing_date(today_vn_str)
+                        self.last_morning_date = today_vn_str
 
             except Exception as e:
-                time.sleep(5)
+                time.sleep(2)
 
-            time.sleep(2)
+            time.sleep(1)
 
     def _poll_updates(self, bot_token: str, client: HCMUTEClient):
-        """Fetch and handle commands like /start, /today, /tkb, /thi, /nhacnho, /nghi."""
+        """Fetch Telegram updates and dispatch immediately to background workers."""
         url = f"https://api.telegram.org/bot{bot_token}/getUpdates"
         params = {"offset": self.last_update_id + 1, "timeout": 2}
 
         try:
             resp = requests.get(url, params=params, timeout=5)
             if resp.status_code == 409:
-                # Webhook is currently active; let webhook handle updates
-                time.sleep(10)
+                # Webhook conflict: auto-delete stale webhook so polling resumes immediately
+                try:
+                    requests.post(f"https://api.telegram.org/bot{bot_token}/deleteWebhook", timeout=3)
+                except Exception:
+                    pass
+                time.sleep(2)
                 return
+
             if resp.status_code != 200:
+                time.sleep(1)
                 return
 
             data = resp.json()
             if not data.get("ok"):
                 return
 
-            for upd in data.get("result", []):
-                self.last_update_id = upd.get("update_id", self.last_update_id)
-                process_telegram_update(upd, bot_token, client)
-        except Exception:
+            updates = data.get("result", [])
+            for upd in updates:
+                upd_id = upd.get("update_id", 0)
+                if upd_id in _processed_update_ids:
+                    continue
+                _processed_update_ids.add(upd_id)
+                if len(_processed_update_ids) > 2000:
+                    _processed_update_ids.clear()
+
+                if upd_id > self.last_update_id:
+                    self.last_update_id = upd_id
+                    save_last_offset(upd_id)
+
+                # Dispatch update to an isolated worker thread so polling never freezes!
+                threading.Thread(
+                    target=process_telegram_update,
+                    args=(upd, bot_token, client),
+                    daemon=True
+                ).start()
+
+        except requests.exceptions.Timeout:
             pass
-
-
-MAIN_INLINE_KEYBOARD = {
-    "inline_keyboard": [
-        [
-            {"text": "📅 Lịch hôm nay", "callback_data": "action_today"},
-            {"text": "📚 5 buổi học tới", "callback_data": "action_tkb"},
-        ],
-        [
-            {"text": "🎯 Lịch thi", "callback_data": "action_thi"},
-            {"text": "❌ Báo nghỉ môn", "callback_data": "action_nghi"},
-        ],
-        [
-            {"text": "🔄 Đồng bộ realtime", "callback_data": "action_sync"},
-        ],
-    ]
-}
-
-
-def trigger_morning_briefing(client: HCMUTEClient, bot_token: Optional[str] = None) -> dict:
-    """Send morning briefing to all registered active users."""
-    if not bot_token:
-        cfg = load_config().get("telegram", {})
-        bot_token = cfg.get("bot_token", "").strip()
-    if not bot_token:
-        return {"total": 0, "sent": 0, "errors": 0, "message": "Bot token not configured"}
-
-    users = load_telegram_users()
-    briefing_text = format_today_schedule(client)
-    formatted = f"🌅 <b>BẢN TIN BUỔI SÁNG HCMUTE</b>\n\n{briefing_text}"
-    sent, errors = 0, 0
-    for chat_id, u in users.items():
-        if u.get("active", True) and u.get("morning_briefing", True):
-            if send_telegram_message(bot_token, chat_id, formatted, reply_markup=MAIN_INLINE_KEYBOARD):
-                sent += 1
-            else:
-                errors += 1
-    return {"total": len(users), "sent": sent, "errors": errors}
-
-
-def format_upcoming_classes(client: HCMUTEClient, limit: int = 5) -> str:
-    """Format the next upcoming classes for students."""
-    now = datetime.now()
-    classes = []
-    if client.ensure_authenticated():
-        try:
-            yt = client.get_year_and_term()
-            curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or "2026-2027"
-            curr_term = yt.get("CurrentTerm") or yt.get("HocKyHienTai") or "HK01"
-            raw_sched = client.get_schedule_semester(curr_year, curr_term)
-            classes = parse_semester_schedule(raw_sched)
         except Exception:
-            pass
-    if not classes:
-        try:
-            from src.web_server import load_feed_cache
-            classes = [c for c in load_feed_cache() if (c.event_type or "").upper() in ("CLASS", "TKB")]
-        except Exception:
-            classes = []
-
-    cancelled_set = load_cancellations()
-    valid_classes = [c for c in classes if c.uid not in cancelled_set]
-
-    upcoming = [c for c in valid_classes if c.end_datetime >= now]
-    upcoming.sort(key=lambda x: x.start_datetime)
-
-    if not upcoming:
-        return "🏖️ Bạn không còn buổi học nào trong kỳ này."
-
-    lines = [f"📚 <b>{min(limit, len(upcoming))} BUỔI HỌC SẮP TỚI:</b>\n"]
-    for c in upcoming[:limit]:
-        day_str = c.start_datetime.strftime("%d/%m/%Y")
-        time_str = f"{c.start_datetime.strftime('%H:%M')} - {c.end_datetime.strftime('%H:%M')}"
-        room = c.location.split(",")[0]
-        diff = (c.start_datetime.date() - now.date()).days
-        countdown = "Hôm nay" if diff == 0 else (f"Còn {diff} ngày" if diff > 0 else "")
-        lines.append(f"• <b>{c.title}</b> ({countdown})")
-        lines.append(f"  📅 {day_str} | ⏰ {time_str} | 📍 {room}\n")
-    return "\n".join(lines)
+            time.sleep(1)
 
 
 def _send_cancellation_picker(bot_token: str, chat_id: str, client: HCMUTEClient):
     """Present 1-tap interactive inline buttons for classes in the next 7 days."""
-    now = datetime.now()
+    now = get_vietnam_now()
     today = now.date()
-    client.ensure_authenticated()
-    from src.web_server import load_feed_cache
     all_events = load_feed_cache()
     classes = [e for e in all_events if (e.event_type or "").upper() in ("CLASS", "TKB")]
     cancelled_set = load_cancellations()
@@ -995,7 +1206,7 @@ def _send_cancellation_picker(bot_token: str, chat_id: str, client: HCMUTEClient
     upcoming_7d.sort(key=lambda x: x.start_datetime)
 
     if not upcoming_7d:
-        send_telegram_message(bot_token, chat_id, "🏖️ Bạn không có buổi học nào trong 7 ngày tới.")
+        send_telegram_message(bot_token, chat_id, "🏖️ Bạn không có buổi học nào trong 7 ngày tới.", reply_markup=MAIN_INLINE_KEYBOARD)
     else:
         votes_db = load_cancellation_votes()
         users_cnt = len(load_telegram_users()) or 1
@@ -1025,9 +1236,8 @@ def _send_restore_picker(bot_token: str, chat_id: str):
     """Present 1-tap buttons to restore previously cancelled classes."""
     cancelled_set = load_cancellations()
     if not cancelled_set:
-        send_telegram_message(bot_token, chat_id, "✔ Hiện không có môn nào đang ở trạng thái báo nghỉ.")
+        send_telegram_message(bot_token, chat_id, "✔ Hiện không có môn nào đang ở trạng thái báo nghỉ.", reply_markup=MAIN_INLINE_KEYBOARD)
     else:
-        from src.web_server import load_feed_cache
         all_events = load_feed_cache()
         ev_map = {e.uid: e for e in all_events}
         buttons = []
@@ -1046,7 +1256,6 @@ def _send_restore_picker(bot_token: str, chat_id: str):
 
 def _handle_makeup_class_input(bot_token: str, chat_id: str, payload: str):
     """Parse and record make-up class from student input."""
-    import re
     try:
         parts = [p.strip() for p in payload.split(",") if p.strip()]
         sub_name = parts[0]
@@ -1060,7 +1269,7 @@ def _handle_makeup_class_input(bot_token: str, chat_id: str, payload: str):
             return
 
         d_val, m_val = int(m_d.group(1)), int(m_d.group(2))
-        y_val = int(m_d.group(3)) if m_d.group(3) else datetime.now().year
+        y_val = int(m_d.group(3)) if m_d.group(3) else get_vietnam_now().year
 
         m_t = re.search(r"(\d{1,2})(?:[:gh](\d{2}))?", raw_t)
         hh = int(m_t.group(1)) if m_t else 7
@@ -1086,7 +1295,7 @@ def _handle_login_command(bot_token: str, chat_id: str, text: str, client: HCMUT
     """Handle /login credentials."""
     parts = text.split()
     if len(parts) < 3:
-        send_telegram_message(bot_token, chat_id, "ℹ️ Cú pháp đăng nhập trực tiếp:\n<code>/login &lt;MSSV&gt; &lt;Mật khẩu&gt;</code>\n\nSau khi đăng nhập 1 lần, tool sẽ tự động duy trì đồng bộ suốt kỳ.")
+        send_telegram_message(bot_token, chat_id, "ℹ️ Cú pháp đăng nhập trực tiếp:\n<code>/login &lt;MSSV&gt; &lt;Mật khẩu&gt;</code>\n\nSau khi đăng nhập 1 lần, bot sẽ tự động duy trì đồng bộ suốt kỳ.")
     else:
         u_in, p_in = parts[1].strip(), parts[2].strip()
         try:
@@ -1103,7 +1312,7 @@ def _handle_login_command(bot_token: str, chat_id: str, text: str, client: HCMUT
                 f"✅ <b>ĐĂNG NHẬP THÀNH CÔNG!</b>\n\n"
                 f"👤 Sinh viên: <b>{p_res.get('FullName', u_in)}</b>\n"
                 f"🎓 MSSV: <b>{u_in}</b>\n\n"
-                f"✔ Phiên đăng nhập đã được lưu bền vững. Bạn không cần phải mở web nữa, bot sẽ tự động thông báo lịch học, lịch thi và báo nghỉ/bù suốt cả kỳ!",
+                f"✔ Phiên đăng nhập đã được lưu bền vững. Bot sẽ tự động thông báo lịch học, lịch thi và báo nghỉ/bù suốt cả kỳ!",
                 reply_markup=MAIN_INLINE_KEYBOARD
             )
         except Exception as err:
@@ -1112,9 +1321,8 @@ def _handle_login_command(bot_token: str, chat_id: str, text: str, client: HCMUT
 
 def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> None:
     """
-    Seamless, unified processor for incoming Telegram updates.
-    Handles callback queries, deep-links, 8-digit MSSV, phone numbers,
-    natural keywords, and slash commands with zero cognitive friction.
+    Ultra-fast, non-blocking processor for incoming Telegram updates.
+    Responds in <0.05s to inline buttons and natural commands.
     """
     # 1. Handle Inline Button Clicks (Callback Queries)
     if "callback_query" in upd:
@@ -1124,14 +1332,30 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
         from_user = cb.get("from", {})
         user_chat_id = str(from_user.get("id"))
 
+        # Instantly acknowledge callback query to stop Telegram loading spinner (<0.05s)
+        if cb_id and not cb_data.startswith("cancel_class:") and not cb_data.startswith("restore_class:"):
+            try:
+                requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
+                    json={"callback_query_id": cb_id},
+                    timeout=2
+                )
+            except Exception:
+                pass
+
         if cb_data.startswith("cancel_class:"):
             class_uid = cb_data.replace("cancel_class:", "")
             res = record_cancellation_vote(class_uid, user_chat_id, bot_token=bot_token)
             if res.get("status") == "confirmed":
-                requests.post(
-                    f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
-                    json={"callback_query_id": cb_id, "text": "✔ Đã xác nhận nghỉ học thành công!"}
-                )
+                if cb_id:
+                    try:
+                        requests.post(
+                            f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
+                            json={"callback_query_id": cb_id, "text": "✔ Đã xác nhận nghỉ học thành công!"},
+                            timeout=2
+                        )
+                    except Exception:
+                        pass
                 msg_txt = (
                     f"✅ <b>ĐÃ XÁC NHẬN NGHỈ HỌC THÀNH CÔNG!</b>\n\n"
                     f"📚 Môn: <b>{res.get('title')}</b>\n"
@@ -1141,10 +1365,15 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
                 )
                 send_telegram_message(bot_token, user_chat_id, msg_txt, reply_markup=MAIN_INLINE_KEYBOARD)
             else:
-                requests.post(
-                    f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
-                    json={"callback_query_id": cb_id, "text": f"🗳️ Đã ghi nhận biểu quyết ({res.get('votes')}/{res.get('needed')} bạn)!"}
-                )
+                if cb_id:
+                    try:
+                        requests.post(
+                            f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
+                            json={"callback_query_id": cb_id, "text": f"🗳️ Đã ghi nhận ({res.get('votes')}/{res.get('needed')})!"},
+                            timeout=2
+                        )
+                    except Exception:
+                        pass
                 msg_txt = (
                     f"🗳️ <b>ĐÃ GHI NHẬN Ý KIẾN BÁO NGHỈ CỦA BẠN!</b>\n\n"
                     f"📚 Môn: <b>{res.get('title')}</b>\n"
@@ -1157,37 +1386,40 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
         elif cb_data.startswith("restore_class:"):
             class_uid = cb_data.replace("restore_class:", "")
             remove_cancellation_vote(class_uid, user_chat_id, bot_token=bot_token)
-            requests.post(
-                f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
-                json={"callback_query_id": cb_id, "text": "✔ Đã hủy biểu quyết báo nghỉ!"}
-            )
+            if cb_id:
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
+                        json={"callback_query_id": cb_id, "text": "✔ Đã hủy biểu quyết báo nghỉ!"},
+                        timeout=2
+                    )
+                except Exception:
+                    pass
             send_telegram_message(
                 bot_token,
                 user_chat_id,
                 "✅ <b>Đã hủy biểu quyết báo nghỉ!</b>\nBuổi học đã được khôi phục trở lại vào lịch của bạn.",
                 reply_markup=MAIN_INLINE_KEYBOARD
             )
+
         elif cb_data == "action_today":
-            requests.post(f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery", json={"callback_query_id": cb_id})
-            send_telegram_message(bot_token, user_chat_id, format_today_schedule(client), reply_markup=MAIN_INLINE_KEYBOARD)
+            send_telegram_message(bot_token, user_chat_id, format_today_schedule(client, chat_id=user_chat_id), reply_markup=MAIN_INLINE_KEYBOARD)
         elif cb_data == "action_tkb":
-            requests.post(f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery", json={"callback_query_id": cb_id})
-            send_telegram_message(bot_token, user_chat_id, format_upcoming_classes(client), reply_markup=MAIN_INLINE_KEYBOARD)
+            send_telegram_message(bot_token, user_chat_id, format_upcoming_classes(client, chat_id=user_chat_id), reply_markup=MAIN_INLINE_KEYBOARD)
         elif cb_data == "action_thi":
-            requests.post(f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery", json={"callback_query_id": cb_id})
-            send_telegram_message(bot_token, user_chat_id, format_upcoming_exams(client), reply_markup=MAIN_INLINE_KEYBOARD)
+            send_telegram_message(bot_token, user_chat_id, format_upcoming_exams(client, chat_id=user_chat_id), reply_markup=MAIN_INLINE_KEYBOARD)
         elif cb_data == "action_nghi":
-            requests.post(f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery", json={"callback_query_id": cb_id})
             _send_cancellation_picker(bot_token, user_chat_id, client)
+        elif cb_data == "action_me":
+            send_telegram_message(bot_token, user_chat_id, format_student_info(user_chat_id, client), reply_markup=MAIN_INLINE_KEYBOARD)
         elif cb_data == "action_sync":
-            requests.post(f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery", json={"callback_query_id": cb_id})
             send_telegram_message(bot_token, user_chat_id, "⏳ Đang kết nối Cổng trường HCMUTE để quét cập nhật...")
             res = auto_sync_and_detect_changes(client, bot_token=bot_token, force=True)
             msg_sync = (
                 f"🔄 <b>KẾT QUẢ ĐỒNG BỘ REALTIME:</b>\n\n"
                 f"• Trạng thái: <b>{res.get('status', 'OK').upper()}</b>\n"
-                f"• Môn học phát hiện báo nghỉ: <b>{res.get('cancelled_count', 0)}</b>\n"
-                f"• Môn học bù mới phát hiện: <b>{res.get('makeup_count', 0)}</b>\n\n"
+                f"• Buổi học phát hiện báo nghỉ: <b>{res.get('cancelled_count', 0)}</b>\n"
+                f"• Buổi học bù mới phát hiện: <b>{res.get('makeup_count', 0)}</b>\n\n"
                 f"✔ Toàn bộ lịch Google Calendar và Apple Calendar đã được cập nhật bản mới nhất!"
             )
             send_telegram_message(bot_token, user_chat_id, msg_sync, reply_markup=MAIN_INLINE_KEYBOARD)
@@ -1207,37 +1439,39 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
     full_name = f"{first_name} {last_name}".strip() or "Sinh viên"
     tg_username = from_user.get("username", "")
 
-    # Always ensure user is registered in system roster whenever they chat with bot
-    register_or_update_telegram_user(
+    # Always ensure user is registered in system roster
+    user_rec = register_or_update_telegram_user(
         chat_id=chat_id,
         name=full_name,
         username=tg_username,
     )
 
-    # Seamless Feature: Auto-detect MSSV or Phone Number (7 to 11 digits)
-    import re
+    # Auto-detect MSSV or /mssv command (e.g. 24144177 or /mssv 24144177)
+    mssv_cmd = re.match(r"^/mssv(?:\s+(\d{7,11}))?$", text, flags=re.IGNORECASE)
     digit_match = re.match(r"^(\d{7,11})$", text)
-    if digit_match:
-        student_id_or_phone = digit_match.group(1)
-        register_or_update_telegram_user(
+    if digit_match or (mssv_cmd and mssv_cmd.group(1)):
+        student_id = digit_match.group(1) if digit_match else mssv_cmd.group(1)
+        user_rec = register_or_update_telegram_user(
             chat_id=chat_id,
-            mssv=student_id_or_phone,
+            mssv=student_id,
             name=full_name,
             username=tg_username,
         )
+        record_student_access(student_id, user_rec.get("name", full_name), channel="Telegram Bot")
         welcome_lines = [
-            f"🎉 <b>KÍCH HOẠT THÔNG BÁO TỰ ĐỘNG THÀNH CÔNG!</b>",
-            f"👤 Sinh viên: <b>{full_name}</b>",
-            f"🎓 MSSV/SĐT: <code>{student_id_or_phone}</code>\n",
-            "🌟 <b>Trợ lý tự động hoàn toàn (Set & Forget):</b>",
+            f"✅ <b>ĐÃ LIÊN KẾT MSSV THÀNH CÔNG!</b>\n",
+            f"👤 Sinh viên: <b>{user_rec.get('name', full_name)}</b>",
+            f"🎓 MSSV: <code>{student_id}</code>",
+            f"💬 Telegram: <code>{chat_id}</code> (@{tg_username or 'N/A'})\n",
+            "🌟 <b>Trợ lý tự động hoàn toàn:</b>",
             "• ☀️ <b>06:30 sáng:</b> Tự gửi lịch học & phòng học hôm nay",
             "• 🔥 <b>Cận kề kỳ thi:</b> Tự động nhắc phòng thi & giờ thi",
-            "• ⚠️ <b>Báo nghỉ/bù:</b> Cảnh báo ngay lập tức nếu giảng viên đổi lịch\n",
-            "<i>Bạn không cần mở web hay nhớ lệnh nào nữa!</i>",
+            "• ⚠️ <b>Báo nghỉ/bù:</b> Báo ngay khi giảng viên đổi phòng/lịch\n",
+            "<i>Lịch học hôm nay:</i>",
         ]
-        send_telegram_message(bot_token, chat_id, "\n".join(welcome_lines), reply_markup=MAIN_INLINE_KEYBOARD)
-        today_text = format_today_schedule(client)
-        send_telegram_message(bot_token, chat_id, today_text)
+        today_text = format_today_schedule(client, chat_id=chat_id)
+        combined = "\n".join(welcome_lines) + "\n\n" + today_text
+        send_telegram_message(bot_token, chat_id, combined, reply_markup=MAIN_INLINE_KEYBOARD)
         return
 
     cmd = text.split()[0].lower()
@@ -1246,34 +1480,42 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
     if cmd == "/start":
         parts = text.split()
         mssv_link = parts[1].strip() if len(parts) > 1 else ""
-        register_or_update_telegram_user(
+        user_rec = register_or_update_telegram_user(
             chat_id=chat_id,
             mssv=mssv_link,
             name=full_name,
             username=tg_username,
         )
+        disp_name = user_rec.get("name") or full_name
+        disp_mssv = user_rec.get("mssv") or ""
+        if disp_mssv:
+            record_student_access(disp_mssv, disp_name, channel="Telegram Bot")
         welcome_lines = [
-            f"👋 <b>Xin chào {full_name}!</b>",
-            "Trợ lý <b>HCMUTE Calendar & Realtime Sync</b> đã kết nối thành công!\n",
+            f"👋 <b>Xin chào {disp_name}!</b>",
+            f"🎓 MSSV: <code>{disp_mssv}</code>" if disp_mssv else "",
+            "Trợ lý <b>HCMUTE Calendar & Realtime Sync</b> đã sẵn sàng phục vụ bạn!\n",
             "🌟 <b>Hệ thống hoạt động hoàn toàn tự động:</b>",
             "• ☀️ <b>06:30 sáng:</b> Tự gửi lịch học & phòng học hôm nay",
             "• 🔥 <b>Cận kề kỳ thi:</b> Tự động nhắc phòng thi & giờ thi",
             "• ⚠️ <b>Báo nghỉ/bù:</b> Báo ngay khi giảng viên đổi phòng/lịch\n",
-            "<i>Bạn chỉ cần bấm nút bên dưới để xem thông tin bất kỳ lúc nào:</i>"
         ]
-        send_telegram_message(bot_token, chat_id, "\n".join(welcome_lines), reply_markup=MAIN_INLINE_KEYBOARD)
-        today_text = format_today_schedule(client)
-        send_telegram_message(bot_token, chat_id, today_text)
+        welcome_lines = [l for l in welcome_lines if l]
+        today_text = format_today_schedule(client, chat_id=chat_id)
+        combined = "\n".join(welcome_lines) + "\n\n" + today_text
+        send_telegram_message(bot_token, chat_id, combined, reply_markup=MAIN_INLINE_KEYBOARD)
         return
 
     elif cmd in ("/today", "/homnay") or any(w in text_lower for w in ["hôm nay", "hom nay", "nay học gì", "lịch nay"]):
-        send_telegram_message(bot_token, chat_id, format_today_schedule(client), reply_markup=MAIN_INLINE_KEYBOARD)
+        send_telegram_message(bot_token, chat_id, format_today_schedule(client, chat_id=chat_id), reply_markup=MAIN_INLINE_KEYBOARD)
 
     elif cmd in ("/thi", "/lichthi", "/exam") or any(w in text_lower for w in ["lịch thi", "lich thi", "khi nào thi", "thi cử"]):
-        send_telegram_message(bot_token, chat_id, format_upcoming_exams(client), reply_markup=MAIN_INLINE_KEYBOARD)
+        send_telegram_message(bot_token, chat_id, format_upcoming_exams(client, chat_id=chat_id), reply_markup=MAIN_INLINE_KEYBOARD)
 
     elif cmd in ("/tkb", "/schedule") or any(w in text_lower for w in ["thời khóa biểu", "tkb", "lịch học", "lich hoc", "môn học"]):
-        send_telegram_message(bot_token, chat_id, format_upcoming_classes(client), reply_markup=MAIN_INLINE_KEYBOARD)
+        send_telegram_message(bot_token, chat_id, format_upcoming_classes(client, chat_id=chat_id), reply_markup=MAIN_INLINE_KEYBOARD)
+
+    elif cmd in ("/me", "/profile", "/hoso", "/info") or any(w in text_lower for w in ["mssv", "thông tin", "hồ sơ", "ho so"]):
+        send_telegram_message(bot_token, chat_id, format_student_info(chat_id, client), reply_markup=MAIN_INLINE_KEYBOARD)
 
     elif cmd in ("/nhacnho", "/deadline", "/thongbao") or any(w in text_lower for w in ["nhắc nhở", "deadline", "học phí", "shcd"]):
         send_telegram_message(bot_token, chat_id, format_reminders(client), reply_markup=MAIN_INLINE_KEYBOARD)

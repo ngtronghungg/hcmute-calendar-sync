@@ -2,7 +2,10 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0c10">
   <title>HCMUTE Calendar — Trung tâm Quản trị (Admin Portal)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -340,6 +343,61 @@
     .hidden {
       display: none !important;
     }
+
+    /* Mobile Responsive Optimizations for Admin (iOS & Android) */
+    @media (max-width: 768px) {
+      header {
+        padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .brand-title {
+        font-size: 14px;
+      }
+      .nav-actions {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+      }
+      main {
+        padding: 16px 14px calc(40px + env(safe-area-inset-bottom));
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .card {
+        padding: 16px;
+        border-radius: 12px;
+      }
+      .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .card-header > div:last-child {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .card-header > div:last-child button {
+        flex: 1 1 auto;
+      }
+      .table-container {
+        -webkit-overflow-scrolling: touch;
+      }
+      table {
+        min-width: 580px;
+      }
+      input, select, textarea {
+        font-size: 16px !important; /* Prevents iOS Safari auto-zoom */
+      }
+      .auth-box {
+        padding: 24px 20px;
+        margin: 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -410,10 +468,10 @@
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-label">
-            <span>👥 Sinh viên liên kết</span>
+            <span>👥 Sinh viên đã truy cập</span>
           </div>
           <div class="stat-value" id="statStudentCount">0</div>
-          <div class="stat-desc">Đã kích hoạt trợ lý Telegram tự động</div>
+          <div class="stat-desc">MSSV đã tương tác qua Web / Telegram</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">
@@ -445,10 +503,10 @@
         <div class="card-header">
           <div>
             <h3 class="card-title">
-              <span>👥 Danh sách Sinh viên đã kết nối Bot Telegram</span>
+              <span>👥 Danh sách MSSV đã truy cập Hệ thống</span>
             </h3>
             <p class="card-subtitle">
-              Danh sách sinh viên đang nhận thông báo lịch học 06:30 sáng, lịch thi và báo nghỉ qua Telegram.
+              Danh sách MSSV sinh viên đã truy cập qua Web Portal hoặc Telegram Bot.
             </p>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -465,11 +523,11 @@
           <table>
             <thead>
               <tr>
-                <th>MSSV / SĐT</th>
+                <th>MSSV</th>
                 <th>Họ và Tên</th>
-                <th>Telegram Chat ID</th>
-                <th>Username</th>
-                <th>Thời gian kết nối</th>
+                <th>Kênh truy cập</th>
+                <th>Truy cập gần nhất (Giờ VN)</th>
+                <th style="text-align: center;">Lượt truy cập</th>
                 <th style="text-align: right;">Hành động</th>
               </tr>
             </thead>
@@ -669,6 +727,7 @@
     }
 
     // 1. Students List
+    // 1. Students Access List
     async function loadAdminUsers() {
       const tbody = document.getElementById('studentTableBody');
       const statCount = document.getElementById('statStudentCount');
@@ -689,53 +748,80 @@
         if (users.length === 0) {
           tbody.innerHTML = `
             <tr>
-              <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
-                Chưa có sinh viên nào liên kết Bot Telegram. Khi có sinh viên bấm Start hoặc nhập ID trên trang chủ, thông tin sẽ hiện ở đây.
+              <td colspan="6" style="text-align: center; padding: 28px; color: var(--text-muted);">
+                Chưa có sinh viên nào truy cập hệ thống. Khi sinh viên đăng nhập cổng trường hoặc nhắn tin với Bot Telegram, MSSV sẽ tự động xuất hiện ở đây.
               </td>
             </tr>
           `;
           return;
         }
 
-        tbody.innerHTML = users.map(u => `
-          <tr>
-            <td style="font-weight: 600; color: var(--accent-blue);">${u.mssv || '—'}</td>
-            <td style="font-weight: 500;">${u.name || 'Sinh viên'}</td>
-            <td style="font-family: var(--font-mono); font-size: 12px;">${u.chat_id}</td>
-            <td style="color: var(--text-muted);">${u.username ? '@' + u.username : '—'}</td>
-            <td style="color: var(--text-dim); font-size: 11px;">${u.registered_at || '—'}</td>
-            <td style="text-align: right;">
-              <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.chat_id}')">
-                🗑️ Xóa
-              </button>
-            </td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = users.map(u => {
+          const mssvStr = u.mssv || '—';
+          const nameStr = u.name || 'Sinh viên';
+          const channelStr = u.channel || 'Web Portal';
+          const lastSeenStr = u.last_seen || u.registered_at || '—';
+          const countVal = u.access_count || 1;
+          const chatIdVal = u.chat_id || '';
+
+          // Badges for channels
+          let channelBadges = '';
+          if (channelStr.includes('Telegram')) {
+            channelBadges += `<span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); margin-right: 4px;">Telegram</span>`;
+          }
+          if (channelStr.includes('Web')) {
+            channelBadges += `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">Web Portal</span>`;
+          }
+          if (!channelBadges) {
+            channelBadges = `<span class="badge badge-gray">${channelStr}</span>`;
+          }
+
+          return `
+            <tr>
+              <td>
+                <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-blue); font-size: 14px; letter-spacing: 0.5px;">${mssvStr}</span>
+              </td>
+              <td style="font-weight: 500;">${nameStr}</td>
+              <td>${channelBadges}</td>
+              <td style="color: var(--text-muted); font-size: 12px;">${lastSeenStr}</td>
+              <td style="text-align: center;">
+                <span style="display: inline-block; padding: 2px 10px; background: rgba(255,255,255,0.06); border-radius: 999px; font-size: 12px; font-weight: 600; font-family: var(--font-mono);">
+                  ${countVal}
+                </span>
+              </td>
+              <td style="text-align: right; white-space: nowrap;">
+                <button class="btn btn-danger btn-sm" onclick="deleteStudentAccessRecord('${mssvStr}', '${chatIdVal}')" title="Xóa khỏi danh sách">
+                  🗑️ Xóa
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
 
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-red); padding: 16px;">Lỗi tải dữ liệu: ${err.message}</td></tr>`;
       }
     }
 
-    // 2. Delete Student
-    async function deleteUser(chatId) {
-      if (!confirm(`Bạn có chắc muốn xóa sinh viên có Chat ID ${chatId}?`)) return;
+    // 2. Delete Student Access Record
+    async function deleteStudentAccessRecord(mssv, chatId) {
+      if (!confirm(`Bạn có chắc muốn xóa bản ghi MSSV [${mssv}] khỏi danh sách truy cập?`)) return;
 
       try {
-        const res = await fetch('/api/telegram/delete-user', {
+        const res = await fetch('/api/admin/student-access/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminPasscode },
-          body: JSON.stringify({ chat_id: chatId })
+          body: JSON.stringify({ mssv: mssv !== '—' ? mssv : '', chat_id: chatId })
         });
         const data = await res.json();
         if (data.success) {
-          showBanner('Đã xóa sinh viên khỏi danh sách.', 'success');
+          showBanner(`Đã xóa MSSV [${mssv}] thành công!`, 'success');
           await loadAdminUsers();
         } else {
           showBanner('Lỗi: ' + data.message, 'error');
         }
       } catch (err) {
-        showBanner('Lỗi: ' + err.message, 'error');
+        showBanner('Lỗi kết nối: ' + err.message, 'error');
       }
     }
 

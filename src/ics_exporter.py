@@ -5,10 +5,13 @@ Apple Calendar, Microsoft Outlook, etc.
 """
 
 import os
+import zoneinfo
 from datetime import datetime, timezone, timedelta
 from typing import List
-from icalendar import Calendar, Event as ICalEvent, Alarm
+from icalendar import Calendar, Event as ICalEvent, Alarm, Timezone, TimezoneStandard
 from src.schedule_parser import CalendarEvent
+
+VIETNAM_TZ = zoneinfo.ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def create_ical_calendar(
@@ -16,12 +19,23 @@ def create_ical_calendar(
     calendar_name: str = "HCMUTE Schedule & Reminders",
     add_reminders: bool = True,
 ) -> Calendar:
-    """Create an icalendar.Calendar object from a list of CalendarEvent."""
+    """Create an icalendar.Calendar object strictly pinned to Asia/Ho_Chi_Minh (UTC+7)."""
     cal = Calendar()
     cal.add("prodid", "-//HCMUTE Calendar Sync//VN")
     cal.add("version", "2.0")
     cal.add("x-wr-calname", calendar_name)
     cal.add("x-wr-timezone", "Asia/Ho_Chi_Minh")
+
+    # RFC 5545 VTIMEZONE component for Asia/Ho_Chi_Minh
+    vtz = Timezone()
+    vtz.add("tzid", "Asia/Ho_Chi_Minh")
+    vtz_std = TimezoneStandard()
+    vtz_std.add("dtstart", datetime(1970, 1, 1, 0, 0, 0))
+    vtz_std.add("tzoffsetfrom", timedelta(hours=7))
+    vtz_std.add("tzoffsetto", timedelta(hours=7))
+    vtz_std.add("tzname", "+07")
+    vtz.add_component(vtz_std)
+    cal.add_component(vtz)
 
     import re
     from src.schedule_parser import assign_course_colors, get_course_color
@@ -33,9 +47,12 @@ def create_ical_calendar(
         ie.add("uid", f"{ev.uid}@hcmute.edu.vn")
         ie.add("dtstamp", datetime.now(timezone.utc))
 
-        # Local datetime
-        ie.add("dtstart", ev.start_datetime)
-        ie.add("dtend", ev.end_datetime)
+        # Explicit Vietnam Timezone (UTC+7)
+        st_vn = ev.start_datetime.replace(tzinfo=VIETNAM_TZ) if ev.start_datetime.tzinfo is None else ev.start_datetime
+        en_vn = ev.end_datetime.replace(tzinfo=VIETNAM_TZ) if ev.end_datetime.tzinfo is None else ev.end_datetime
+
+        ie.add("dtstart", st_vn)
+        ie.add("dtend", en_vn)
 
         if ev.location:
             ie.add("location", ev.location)
