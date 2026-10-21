@@ -52,19 +52,125 @@ from src.schedule_cache import (
 
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "config.json"))
+SESSIONS_FILE = os.path.join(PROJECT_ROOT, "data", "sessions.json")
 
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path="")
 
+import secrets
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional, List
+
+ACTIVE_SESSIONS: Dict[str, dict] = {}
+
+
+def load_sessions() -> None:
+    """Load active student sessions from disk."""
+    global ACTIVE_SESSIONS
+    if os.path.exists(SESSIONS_FILE):
+        try:
+            with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+                ACTIVE_SESSIONS = json.load(f)
+        except Exception:
+            ACTIVE_SESSIONS = {}
+
+
+def save_sessions() -> None:
+    """Persist active student sessions to disk."""
+    try:
+        os.makedirs(os.path.dirname(SESSIONS_FILE), exist_ok=True)
+        with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(ACTIVE_SESSIONS, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+load_sessions()
+
+# Clean up legacy single-user cache on boot so no user data is retained across global restarts
+legacy_token_path = os.path.join(PROJECT_ROOT, "data", ".token_cache.json")
+if os.path.exists(legacy_token_path):
+    try:
+        os.remove(legacy_token_path)
+    except Exception:
+        pass
+
 
 def get_client() -> HCMUTEClient:
+    """Internal client used by Telegram background daemon and admin functions."""
     cfg = load_config()
     hcmute_cfg = cfg.get("hcmute", {})
     return HCMUTEClient(
         base_url=hcmute_cfg.get("base_url", "https://portalapi.hcmute.edu.vn/api/"),
         api_key=hcmute_cfg.get("api_key", "utepscRBF0zT2Mqo6vMw69YMOH43IrB2RtXBS0EHit2kzvL2auxaFJBvw=="),
         client_id=hcmute_cfg.get("client_id", "ute"),
-        token_cache_file="data/.token_cache.json",
+        token_cache_file="data/.admin_token.json",
     )
+
+
+def get_request_session() -> Optional[dict]:
+    """
+    Extract session from request header 'X-Session-Token' or 'Authorization: Bearer <token>',
+    cookie 'hcmute_session', or query parameter 'session_token' / 'token'.
+    """
+    token = request.headers.get("X-Session-Token", "").strip()
+    if not token:
+        auth = request.headers.get("Authorization", "").strip()
+        if auth.startswith("Bearer "):
+            token = auth[7:].strip()
+    if not token:
+        token = request.cookies.get("hcmute_session", "").strip()
+    if not token:
+        token = (request.args.get("session_token") or request.args.get("token") or "").strip()
+
+    if not token or token not in ACTIVE_SESSIONS:
+        return None
+
+    session = ACTIVE_SESSIONS[token]
+    expire_str = session.get("expire")
+    if expire_str:
+        try:
+            exp_dt = datetime.fromisoformat(expire_str.replace("Z", "+00:00"))
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > exp_dt:
+                del ACTIVE_SESSIONS[token]
+                save_sessions()
+                return None
+        except Exception:
+            pass
+
+    session["last_active"] = datetime.now(timezone.utc).isoformat()
+    return session
+
+
+def get_session_client(session: Optional[dict] = None) -> Optional[HCMUTEClient]:
+    """Create an ephemeral HCMUTEClient strictly bound to the requesting user's session token."""
+    if session is None:
+        session = get_request_session()
+    if not session:
+        return None
+
+    portal_token = session.get("portal_token")
+    if not portal_token:
+        return None
+
+    cfg = load_config()
+    hcmute_cfg = cfg.get("hcmute", {})
+    client = HCMUTEClient(
+        base_url=hcmute_cfg.get("base_url", "https://portalapi.hcmute.edu.vn/api/"),
+        api_key=hcmute_cfg.get("api_key", "utepscRBF0zT2Mqo6vMw69YMOH43IrB2RtXBS0EHit2kzvL2auxaFJBvw=="),
+        client_id=hcmute_cfg.get("client_id", "ute"),
+        token_cache_file=None,  # Crucial: in-memory only, never leak or write to shared file!
+    )
+    client.token = portal_token
+    client.session_data = session.get("session_data") or {
+        "Id": session.get("mssv"),
+        "FullName": session.get("name"),
+        "Role": session.get("role", "SV"),
+        "StudyStatusName": session.get("status", "Đang học"),
+        "Token": portal_token,
+    }
+    return client
 
 
 # Start Telegram daemon in background (handles polling fallback and morning briefings)
@@ -72,14 +178,24 @@ bot_daemon = get_or_create_bot_daemon(get_client)
 bot_daemon.start()
 
 
+@app.after_request
+def add_cache_headers(response):
+    """Enforce strict no-cache headers on dynamic pages and APIs to guarantee immediate session revocation."""
+    if request.path.startswith("/api/") or request.path in ["/", "/admin"]:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 @app.route("/")
 def index():
-    return send_from_directory(WEB_DIR, "index.html", max_age=3600)
+    return send_from_directory(WEB_DIR, "index.html", max_age=0)
 
 
 @app.route("/admin")
 def admin_page():
-    return send_from_directory(WEB_DIR, "admin.html", max_age=3600)
+    return send_from_directory(WEB_DIR, "admin.html", max_age=0)
 
 
 def check_admin_auth() -> bool:
@@ -101,61 +217,64 @@ def api_admin_verify():
     return jsonify({"success": False, "message": "Mật khẩu quản trị không chính xác."}), 403
 
 
-
 @app.route("/api/status", methods=["GET"])
 def api_status():
-    """Return login state and student profile, auto-renewing session silently if vault credentials exist."""
-    client = get_client()
-    if client.ensure_authenticated():
-        profile = client.get_user_profile() or {}
-        s_id = str(profile.get("Id", "")).strip()
-        s_name = profile.get("FullName") or profile.get("Username", "Sinh viên")
+    """
+    Return login state and student profile for the requesting client.
+    Enforces per-browser session isolation via X-Session-Token.
+    Unauthenticated requests always receive authenticated: false.
+    """
+    session = get_request_session()
+    if not session:
+        return jsonify({"authenticated": False})
+
+    client = get_session_client(session)
+    if client and client.ensure_authenticated():
+        s_id = str(session.get("mssv", "")).strip()
+        s_name = session.get("name", "Sinh viên")
         if s_id:
             record_student_access(s_id, s_name, channel="Web Portal")
         return jsonify({
             "authenticated": True,
+            "session_token": session.get("session_token"),
             "profile": {
-                "id": profile.get("Id", ""),
-                "name": profile.get("FullName") or profile.get("Username", "Sinh viên"),
-                "role": profile.get("Role", "SV"),
-                "status": profile.get("StudyStatusName", "Đang học"),
+                "id": s_id,
+                "name": s_name,
+                "role": session.get("role", "SV"),
+                "status": session.get("status", "Đang học"),
             }
         })
-    if os.path.exists("data/.token_cache.json"):
-        try:
-            with open("data/.token_cache.json", "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return jsonify({
-                "authenticated": True,
-                "token_expired": True,
-                "profile": {
-                    "id": data.get("Id", ""),
-                    "name": data.get("FullName") or data.get("Username", "Sinh viên"),
-                    "role": data.get("Role", "SV"),
-                    "status": data.get("StudyStatusName", "Đang học"),
-                }
-            })
-        except Exception:
-            pass
-    return jsonify({"authenticated": False})
+    else:
+        # Session expired or token invalid
+        token_key = session.get("session_token")
+        if token_key and token_key in ACTIVE_SESSIONS:
+            del ACTIVE_SESSIONS[token_key]
+            save_sessions()
+        return jsonify({"authenticated": False, "token_expired": True})
 
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
     """
     Handle student login.
-    Zero-Knowledge Architecture:
-    - Passwords are never written to disk, database, or server logs.
-    - Password is held in RAM only for the duration of the HTTPS request to portalapi.hcmute.edu.vn,
-      then immediately destroyed with `del password`.
-    - Also supports Direct Token Login (Zero Password).
+    Zero-Knowledge Multi-User Architecture:
+    - Passwords are held in RAM only for the duration of the HTTPS request, then destroyed immediately.
+    - An isolated session_token is generated and returned to the browser.
+    - Passwords are NEVER written to disk, database, or server logs.
     """
     data = request.json or {}
     token_input = data.get("token", "").strip()
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
 
-    client = get_client()
+    cfg = load_config()
+    hcmute_cfg = cfg.get("hcmute", {})
+    client = HCMUTEClient(
+        base_url=hcmute_cfg.get("base_url", "https://portalapi.hcmute.edu.vn/api/"),
+        api_key=hcmute_cfg.get("api_key", "utepscRBF0zT2Mqo6vMw69YMOH43IrB2RtXBS0EHit2kzvL2auxaFJBvw=="),
+        client_id=hcmute_cfg.get("client_id", "ute"),
+        token_cache_file=None,  # In-memory only
+    )
 
     # Option 1: Direct Token Login (Zero Password)
     if token_input:
@@ -167,18 +286,37 @@ def api_login():
                 "FullName": username or "Sinh viên",
                 "Token": token_input,
                 "Role": "SV",
+                "StudyStatusName": "Đang học (Token Auth)",
             }
-            client.save_session(session_payload)
+            client.session_data = session_payload
+
+            session_token = secrets.token_urlsafe(32)
+            session_rec = {
+                "session_token": session_token,
+                "mssv": session_payload["Id"],
+                "name": session_payload["FullName"],
+                "role": session_payload["Role"],
+                "status": session_payload["StudyStatusName"],
+                "portal_token": token_input,
+                "session_data": session_payload,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "last_active": datetime.now(timezone.utc).isoformat(),
+            }
+            ACTIVE_SESSIONS[session_token] = session_rec
+            save_sessions()
             record_student_access(mssv=session_payload["Id"], name=session_payload["FullName"], channel="Web Portal (Token)")
-            return jsonify({
+            resp = jsonify({
                 "success": True,
+                "session_token": session_token,
                 "profile": {
                     "id": session_payload["Id"],
                     "name": session_payload["FullName"],
-                    "role": "SV",
-                    "status": "Đang học (Token Auth)",
+                    "role": session_payload["Role"],
+                    "status": session_payload["StudyStatusName"],
                 }
             })
+            resp.set_cookie("hcmute_session", session_token, max_age=86400 * 7, httponly=False, samesite="Lax")
+            return resp
         except Exception as e:
             return jsonify({"success": False, "message": f"Token không hợp lệ hoặc đã hết hạn: {e}"}), 400
 
@@ -191,28 +329,63 @@ def api_login():
         # Explicit memory purge
         del password
         del data
-        record_student_access(mssv=profile.get("Id", username), name=profile.get("FullName") or profile.get("Username", "Sinh viên"), channel="Web Portal")
-        return jsonify({
+
+        session_token = secrets.token_urlsafe(32)
+        mssv = str(profile.get("Id") or username).strip()
+        name = profile.get("FullName") or profile.get("Username", "Sinh viên")
+        role = profile.get("Role", "SV")
+        status = profile.get("StudyStatusName", "Đang học")
+        expire = profile.get("Expire")
+
+        session_rec = {
+            "session_token": session_token,
+            "mssv": mssv,
+            "name": name,
+            "role": role,
+            "status": status,
+            "portal_token": client.token,
+            "expire": expire,
+            "session_data": profile,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_active": datetime.now(timezone.utc).isoformat(),
+        }
+        ACTIVE_SESSIONS[session_token] = session_rec
+        save_sessions()
+
+        record_student_access(mssv=mssv, name=name, channel="Web Portal")
+        resp = jsonify({
             "success": True,
+            "session_token": session_token,
             "profile": {
-                "id": profile.get("Id", username),
-                "name": profile.get("FullName") or profile.get("Username", "Sinh viên"),
-                "role": profile.get("Role", "SV"),
-                "status": profile.get("StudyStatusName", "Đang học"),
+                "id": mssv,
+                "name": name,
+                "role": role,
+                "status": status,
             }
         })
+        resp.set_cookie("hcmute_session", session_token, max_age=86400 * 7, httponly=False, samesite="Lax")
+        return resp
     except Exception as e:
-        del password
-        del data
+        try:
+            del password
+            del data
+        except Exception:
+            pass
         return jsonify({"success": False, "message": str(e)}), 400
 
 
 @app.route("/api/logout", methods=["POST"])
 def api_logout():
-    """Handle student logout."""
-    client = get_client()
-    client.logout()
-    return jsonify({"success": True})
+    """Handle student logout by revoking their browser session."""
+    session = get_request_session()
+    if session:
+        token = session.get("session_token")
+        if token and token in ACTIVE_SESSIONS:
+            del ACTIVE_SESSIONS[token]
+            save_sessions()
+    resp = jsonify({"success": True})
+    resp.delete_cookie("hcmute_session")
+    return resp
 
 
 @app.route("/api/security/audit", methods=["GET"])
@@ -259,7 +432,7 @@ def api_security_audit():
                 },
                 {
                     "item": "Telegram Chat ID (Nếu sinh viên kết nối Bot)",
-                    "why": "Để Bot gửi thông báo lịch học 06:30 sáng và báo nghỉ môn",
+                    "why": "Để Bot gửi thông báo lịch học 06:30 sáng và báo khi giảng viên cho nghỉ",
                     "sensitivity": "Định danh tin nhắn ẩn danh của Telegram"
                 }
             ],
@@ -275,9 +448,24 @@ def api_security_audit():
 
 @app.route("/api/security/wipe-my-data", methods=["POST"])
 def api_security_wipe():
-    """1-Click Data Wipe (Right to be Forgotten). Clears session and caches."""
-    client = get_client()
-    client.logout()
+    """1-Click Data Wipe (Right to be Forgotten). Clears session and caches for requesting user."""
+    session = get_request_session()
+    mssv = session.get("mssv") if session else None
+
+    if session:
+        token = session.get("session_token")
+        if token and token in ACTIVE_SESSIONS:
+            del ACTIVE_SESSIONS[token]
+            save_sessions()
+
+    if mssv:
+        user_dir = os.path.join(PROJECT_ROOT, "data", "users", mssv)
+        if os.path.exists(user_dir):
+            try:
+                import shutil
+                shutil.rmtree(user_dir)
+            except Exception:
+                pass
 
     try:
         from src.telegram_bot import delete_telegram_user
@@ -294,7 +482,15 @@ def api_security_wipe():
 @app.route("/api/overview", methods=["GET"])
 def api_overview():
     """Fetch current year & term, class schedule, and exam schedule with persistent cache fallback."""
-    client = get_client()
+    session = get_request_session()
+    if not session:
+        return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
+
+    client = get_session_client(session)
+    if not client or not client.ensure_authenticated():
+        return jsonify({"success": False, "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."}), 401
+
+    mssv = str(session.get("mssv", "")).strip()
     from datetime import datetime, timedelta
     now = get_vietnam_now()
 
@@ -313,35 +509,36 @@ def api_overview():
     ]
 
     try:
-        if client.ensure_authenticated():
-            try:
-                yt = client.get_year_and_term()
-                available_years = yt.get("YearStudy") or available_years
-                available_terms = yt.get("Terms") or available_terms
-                curr_year = request.args.get("year") or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
-                curr_term = request.args.get("term") or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
+        try:
+            yt = client.get_year_and_term()
+            available_years = yt.get("YearStudy") or available_years
+            available_terms = yt.get("Terms") or available_terms
+            curr_year = request.args.get("year") or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
+            curr_term = request.args.get("term") or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
 
-                # 2. Live Schedule
-                raw_sched = client.get_schedule_semester(curr_year, curr_term)
-                all_class_events = parse_semester_schedule(raw_sched)
-            except Exception:
-                pass
+            # 2. Live Schedule
+            raw_sched = client.get_schedule_semester(curr_year, curr_term)
+            all_class_events = parse_semester_schedule(raw_sched)
+            if all_class_events:
+                save_feed_cache(all_class_events, mssv=mssv)
+        except Exception:
+            pass
 
-            # 3. Live Exams: combine detailed showexambytime and semester exams
-            try:
-                time_exams = client.get_exams_by_time()
-                all_raw_exams.extend(time_exams)
-            except Exception:
-                pass
-            try:
-                term_exams = client.get_exam_schedule(curr_year, curr_term)
-                all_raw_exams.extend(term_exams)
-            except Exception:
-                pass
+        # 3. Live Exams: combine detailed showexambytime and semester exams
+        try:
+            time_exams = client.get_exams_by_time()
+            all_raw_exams.extend(time_exams)
+        except Exception:
+            pass
+        try:
+            term_exams = client.get_exam_schedule(curr_year, curr_term)
+            all_raw_exams.extend(term_exams)
+        except Exception:
+            pass
 
-        # Fallback to cached classes if live fetch failed or offline
+        # Fallback to cached classes if live fetch failed
         if not all_class_events:
-            cached_events = load_feed_cache()
+            cached_events = load_feed_cache(mssv=mssv)
             all_class_events = [c for c in cached_events if (c.event_type or "").upper() in ("CLASS", "TKB")]
 
         # Always include make-up classes!
@@ -355,9 +552,9 @@ def api_overview():
 
         # Fallback to cached exams if live exams returned empty
         if not exam_events:
-            exam_events = load_cached_exams()
+            exam_events = load_cached_exams(mssv=mssv)
         else:
-            save_cached_exams(exam_events)
+            save_cached_exams(exam_events, mssv=mssv)
 
         assign_course_colors(exam_events)
 
@@ -417,24 +614,28 @@ def api_overview():
         })
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
 
 
-CONSIDERATIONS_CACHE = {"timestamp": 0, "data": []}
+CONSIDERATIONS_CACHE: Dict[str, dict] = {}
 
 
 @app.route("/api/considerations", methods=["GET"])
 def api_considerations():
     """Scan announcements, fee debt, and upcoming exams to formulate reminder recommendations."""
-    client = get_client()
-    if not client.is_authenticated():
+    session = get_request_session()
+    if not session:
         return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
 
+    client = get_session_client(session)
+    if not client or not client.ensure_authenticated():
+        return jsonify({"success": False, "message": "Chưa đăng nhập hoặc phiên đã hết hạn."}), 401
+
+    mssv = str(session.get("mssv", "default")).strip()
     import time
     force = request.args.get("force", "0") in ("1", "true", "True")
-    if not force and CONSIDERATIONS_CACHE["data"] and (time.time() - CONSIDERATIONS_CACHE["timestamp"] < 300):
-        return jsonify({"success": True, "count": len(CONSIDERATIONS_CACHE["data"]), "items": CONSIDERATIONS_CACHE["data"]})
+    user_cached = CONSIDERATIONS_CACHE.get(mssv)
+    if not force and user_cached and (time.time() - user_cached.get("timestamp", 0) < 300):
+        return jsonify({"success": True, "count": len(user_cached.get("data", [])), "items": user_cached.get("data", [])})
 
     try:
         from datetime import datetime, timedelta
@@ -579,8 +780,10 @@ def api_considerations():
                 "notice_type": it.notice_type,
             })
 
-        CONSIDERATIONS_CACHE["timestamp"] = time.time()
-        CONSIDERATIONS_CACHE["data"] = data
+        CONSIDERATIONS_CACHE[mssv] = {
+            "timestamp": time.time(),
+            "data": data,
+        }
         return jsonify({"success": True, "count": len(data), "items": data})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
@@ -589,9 +792,13 @@ def api_considerations():
 @app.route("/api/notice-detail", methods=["GET"])
 def api_notice_detail():
     """Fetch and decrypt full announcement body for reader modal."""
-    client = get_client()
-    if not client.is_authenticated():
+    session = get_request_session()
+    if not session:
         return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
+
+    client = get_session_client(session)
+    if not client or not client.ensure_authenticated():
+        return jsonify({"success": False, "message": "Chưa đăng nhập hoặc phiên đã hết hạn."}), 401
 
     notice_id = request.args.get("id", "").strip()
     notice_type = request.args.get("type", "personal").strip()
@@ -648,7 +855,9 @@ def api_notice_detail():
 @app.route("/api/export-ics", methods=["POST"])
 def api_export_ics():
     """Export schedule, exams, and selected reminders to .ics file with granular category options."""
-    client = get_client()
+    session = get_request_session()
+    client = get_session_client(session) if session else None
+    mssv = str(session.get("mssv", "")).strip() if session else None
 
     try:
         from datetime import datetime, timedelta
@@ -663,7 +872,7 @@ def api_export_ics():
 
         curr_year = "2026-2027"
         curr_term = "HK01"
-        if client.is_authenticated():
+        if client and client.is_authenticated():
             try:
                 yt = client.get_year_and_term()
                 curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
@@ -676,14 +885,14 @@ def api_export_ics():
         # 1. Fetch Schedule (if requested)
         if include_classes:
             classes = []
-            if client.ensure_authenticated():
+            if client and client.ensure_authenticated():
                 try:
                     raw_sched = client.get_schedule_semester(curr_year, curr_term)
                     classes = parse_semester_schedule(raw_sched)
                 except Exception:
                     pass
             if not classes:
-                cached = load_feed_cache()
+                cached = load_feed_cache(mssv=mssv)
                 classes = [c for c in cached if (c.event_type or "").upper() in ("CLASS", "TKB")]
 
             # Include make-up classes!
@@ -699,7 +908,7 @@ def api_export_ics():
         # 2. Fetch Exams (if requested)
         if include_exams:
             parsed_exams = []
-            if client.is_authenticated():
+            if client and client.is_authenticated():
                 raw_exams = []
                 try:
                     raw_exams.extend(client.get_exams_by_time())
@@ -712,9 +921,9 @@ def api_export_ics():
                 parsed_exams = parse_exam_schedule(raw_exams)
 
             if not parsed_exams:
-                parsed_exams = load_cached_exams()
+                parsed_exams = load_cached_exams(mssv=mssv)
             else:
-                save_cached_exams(parsed_exams)
+                save_cached_exams(parsed_exams, mssv=mssv)
 
             seen_exam_keys = set()
             for ex in parsed_exams:
@@ -729,7 +938,7 @@ def api_export_ics():
         # 3. Add Reminders (if requested)
         if include_reminders:
             analyzer = NoticeAnalyzer(load_config())
-            if client.ensure_authenticated():
+            if client and client.ensure_authenticated():
                 try:
                     personal_notices = client.get_personal_messages()[:15]
                     for p in personal_notices:
@@ -794,7 +1003,9 @@ def api_export_ics():
 @app.route("/api/sync-google", methods=["POST"])
 def api_sync_google():
     """Directly push classes, exams, and reminders to dedicated Google Calendars."""
-    client = get_client()
+    session = get_request_session()
+    client = get_session_client(session) if session else None
+    mssv = str(session.get("mssv", "")).strip() if session else None
 
     try:
         cfg = load_config()
@@ -825,7 +1036,7 @@ def api_sync_google():
 
         curr_year = "2026-2027"
         curr_term = "HK01"
-        if client.is_authenticated():
+        if client and client.is_authenticated():
             try:
                 yt = client.get_year_and_term()
                 curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
@@ -839,14 +1050,14 @@ def api_sync_google():
         # 1. Sync Classes to dedicated calendar
         if include_classes:
             classes = []
-            if client.ensure_authenticated():
+            if client and client.ensure_authenticated():
                 try:
                     raw_sched = client.get_schedule_semester(curr_year, curr_term)
                     classes = parse_semester_schedule(raw_sched)
                 except Exception:
                     pass
             if not classes:
-                cached = load_feed_cache()
+                cached = load_feed_cache(mssv=mssv)
                 classes = [c for c in cached if (c.event_type or "").upper() in ("CLASS", "TKB")]
 
             cancelled_set = load_cancellations()
@@ -866,7 +1077,7 @@ def api_sync_google():
         # 2. Sync Exams to dedicated calendar
         if include_exams:
             parsed_exams = []
-            if client.ensure_authenticated():
+            if client and client.ensure_authenticated():
                 raw_exams = []
                 try:
                     raw_exams.extend(client.get_exams_by_time())
@@ -879,7 +1090,7 @@ def api_sync_google():
                 parsed_exams = parse_exam_schedule(raw_exams)
 
             if not parsed_exams:
-                parsed_exams = load_cached_exams()
+                parsed_exams = load_cached_exams(mssv=mssv)
             else:
                 save_cached_exams(parsed_exams)
 
@@ -965,17 +1176,33 @@ def calendar_feed(category_filename="feed.ics"):
     Live webcal/iCal subscription feed.
     Automatically updates on Apple Calendar & Google Calendar in real time.
     Supports clean URLs:
+      - /calendar/<mssv>/feed.ics (classes + exams for that student)
       - /calendar/feed.ics (classes + exams)
       - /calendar/all.ics (classes + exams + reminders)
       - /calendar/tkb.ics (classes only)
       - /calendar/thi.ics (exams only)
       - /calendar/nhacnho.ics (reminders only)
-    Or query parameters: ?classes=1&exams=1&reminders=1
+    Or query parameters: ?classes=1&exams=1&reminders=1&mssv=<mssv>
     """
     from datetime import datetime, timedelta
     now = get_vietnam_now()
 
-    cat = (category_filename or "feed.ics").lower()
+    req_mssv = request.args.get("mssv", "").strip()
+    raw_cat = (category_filename or "feed.ics").strip("/")
+    parts = raw_cat.split("/")
+    if len(parts) >= 2:
+        possible_mssv = parts[0]
+        cat = parts[1].lower()
+        if not req_mssv and (possible_mssv.isalnum() and len(possible_mssv) >= 5):
+            req_mssv = possible_mssv
+    else:
+        cat = raw_cat.lower()
+
+    if not req_mssv:
+        session = get_request_session()
+        if session:
+            req_mssv = str(session.get("mssv", "")).strip()
+
     if cat in ("tkb.ics", "tkb"):
         inc_classes = True
         inc_exams = False
@@ -997,19 +1224,17 @@ def calendar_feed(category_filename="feed.ics"):
         inc_exams = request.args.get("exams", "1") in ("1", "true", "True", "yes")
         inc_reminders = request.args.get("reminders", "0") in ("1", "true", "True", "yes")
 
-    client = get_client()
+    client = None
+    if req_mssv:
+        for s in ACTIVE_SESSIONS.values():
+            if str(s.get("mssv", "")).strip() == req_mssv and s.get("portal_token"):
+                client = get_session_client(s)
+                break
+
     fetched_fresh = False
     all_raw_events = []
 
-    if client.ensure_authenticated():
-        try:
-            from src.telegram_bot import auto_sync_and_detect_changes
-            cfg = load_config()
-            bot_token = cfg.get("telegram", {}).get("bot_token", "")
-            auto_sync_and_detect_changes(client, bot_token=bot_token, force=False)
-        except Exception:
-            pass
-
+    if client and client.ensure_authenticated():
         try:
             yt = client.get_year_and_term()
             curr_year = yt.get("CurrentYear") or yt.get("NamHienTai") or "2026-2027"
@@ -1032,9 +1257,9 @@ def calendar_feed(category_filename="feed.ics"):
                 pass
             parsed_exams = parse_exam_schedule(raw_exams)
             if not parsed_exams:
-                parsed_exams = load_cached_exams()
+                parsed_exams = load_cached_exams(mssv=req_mssv)
             else:
-                save_cached_exams(parsed_exams)
+                save_cached_exams(parsed_exams, mssv=req_mssv)
 
             seen_exam_keys = set()
             for ex in parsed_exams:
@@ -1078,14 +1303,14 @@ def calendar_feed(category_filename="feed.ics"):
                     pass
 
             if all_raw_events:
-                save_feed_cache(all_raw_events)
+                save_feed_cache(all_raw_events, mssv=req_mssv)
                 fetched_fresh = True
         except Exception:
             pass
 
-    # If could not fetch fresh from portal, fallback to cache
+    # If could not fetch fresh from portal, fallback to cache for this student
     if not fetched_fresh:
-        all_raw_events = load_feed_cache()
+        all_raw_events = load_feed_cache(mssv=req_mssv or None)
 
     if not all_raw_events:
         return "Chưa có dữ liệu lịch. Vui lòng mở trang web HCMUTE Sync và đăng nhập để đồng bộ lần đầu.", 404
@@ -1291,7 +1516,7 @@ def api_telegram_register():
             f"🌟 <b>Trợ lý tự động hoàn toàn (Set & Forget):</b>\n"
             f"• ☀️ <b>06:30 sáng:</b> Tự gửi lịch học & phòng học hôm nay\n"
             f"• 🔥 <b>Cận kề kỳ thi:</b> Tự động nhắc phòng thi & giờ thi\n"
-            f"• ⚠️ <b>Báo nghỉ/bù:</b> Cảnh báo ngay lập tức nếu giảng viên đổi lịch\n\n"
+            f"• 🏖️ <b>GV cho nghỉ / bù:</b> Cảnh báo ngay lập tức nếu giảng viên đổi lịch hoặc cho nghỉ\n\n"
             f"<i>Bạn không cần mở web hay nhớ lệnh nào nữa!</i>"
         )
         send_telegram_message(bot_token, chat_id, welcome, reply_markup=MAIN_INLINE_KEYBOARD)
@@ -1416,7 +1641,7 @@ def api_telegram_test():
         "Chào bạn, Trợ lý HCMUTE Calendar đã sẵn sàng:\n"
         "• ☀️ Bản tin 06:30 sáng tóm tắt lịch học\n"
         "• 🔥 Báo động trước ngày thi & giờ thi\n"
-        "• ⚠️ Cảnh báo tự động khi giảng viên báo nghỉ / bù"
+        "• 🏖️ Cảnh báo tự động khi giảng viên cho nghỉ / bù"
     )
     ok = send_telegram_message(token, chat_id, test_msg)
     if ok:
@@ -1562,6 +1787,127 @@ def api_schedule_makeup():
             return jsonify({"success": False, "message": "Thiếu UID buổi học bù."}), 400
         ok = remove_makeup_class(uid)
         return jsonify({"success": ok})
+
+
+# ==========================================
+# FEEDBACK & SUGGESTIONS WITH AI EVALUATION
+# ==========================================
+
+@app.route("/api/feedback/submit", methods=["POST"])
+def api_feedback_submit():
+    """Submit a new student suggestion/feedback and run real-time AI evaluation."""
+    session = get_request_session()
+    if not session:
+        return jsonify({"success": False, "message": "Vui lòng đăng nhập để gửi góp ý."}), 401
+
+    mssv = str(session.get("mssv", "")).strip()
+    name = session.get("name", "Sinh viên")
+
+    data = request.json or {}
+    category = data.get("category", "feature").strip()
+    title = data.get("title", "").strip()
+    content = data.get("content", "").strip()
+    is_anonymous = bool(data.get("is_anonymous", False))
+
+    if not title or not content:
+        return jsonify({"success": False, "message": "Vui lòng nhập đầy đủ tiêu đề và nội dung góp ý."}), 400
+
+    from src.feedback_manager import submit_feedback
+    try:
+        fb = submit_feedback(
+            mssv=mssv,
+            author_name=name,
+            category=category,
+            title=title,
+            content=content,
+            is_anonymous=is_anonymous,
+        )
+        return jsonify({"success": True, "feedback": fb})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+
+@app.route("/api/feedback/my", methods=["GET"])
+def api_feedback_my():
+    """Return all feedback previously submitted by the current authenticated student."""
+    session = get_request_session()
+    if not session:
+        return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
+
+    mssv = str(session.get("mssv", "")).strip()
+    from src.feedback_manager import get_student_feedbacks
+    feedbacks = get_student_feedbacks(mssv)
+    return jsonify({"success": True, "feedbacks": feedbacks})
+
+
+@app.route("/api/admin/feedbacks", methods=["GET"])
+def api_admin_feedbacks():
+    """Admin endpoint: Get all feedbacks categorized across 10 levels with AI stats."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
+
+    lvl_arg = request.args.get("level")
+    level_filter = int(lvl_arg) if lvl_arg and lvl_arg.isdigit() else None
+    status_filter = request.args.get("status")
+
+    from src.feedback_manager import get_admin_feedbacks_overview
+    res = get_admin_feedbacks_overview(level_filter=level_filter, status_filter=status_filter)
+    return jsonify({"success": True, "data": res})
+
+
+@app.route("/api/admin/feedback/status", methods=["POST"])
+def api_admin_feedback_status():
+    """Admin endpoint: Update review status and admin response note."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
+
+    data = request.json or {}
+    fb_id = data.get("id", "").strip()
+    status = data.get("status", "reviewed").strip()
+    admin_note = data.get("admin_note", "").strip()
+
+    from src.feedback_manager import update_feedback_status
+    ok = update_feedback_status(fb_id, status=status, admin_note=admin_note)
+    return jsonify({"success": ok})
+
+
+@app.route("/api/admin/feedback/re-evaluate", methods=["POST"])
+def api_admin_feedback_re_evaluate():
+    """Admin endpoint: Trigger AI re-evaluation on a specific feedback."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
+
+    data = request.json or {}
+    fb_id = data.get("id", "").strip()
+    from src.feedback_manager import re_evaluate_feedback
+    fb = re_evaluate_feedback(fb_id)
+    if not fb:
+        return jsonify({"success": False, "message": "Không tìm thấy góp ý này."}), 404
+    return jsonify({"success": True, "feedback": fb})
+
+
+@app.route("/api/admin/feedback/delete", methods=["POST"])
+def api_admin_feedback_delete():
+    """Admin endpoint: Delete an individual feedback."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
+
+    data = request.json or {}
+    fb_id = data.get("id", "").strip()
+    from src.feedback_manager import delete_feedback
+    ok = delete_feedback(fb_id)
+    return jsonify({"success": ok})
+
+
+@app.route("/api/admin/feedback/purge-spam", methods=["POST"])
+def api_admin_feedback_purge_spam():
+    """Admin endpoint: Purge all feedbacks classified at Level 10 (Spam)."""
+    if not check_admin_auth():
+        return jsonify({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}), 403
+
+    from src.feedback_manager import purge_spam_feedbacks
+    removed = purge_spam_feedbacks()
+    return jsonify({"success": True, "removed": removed})
 
 
 def run_app(port: int = None, open_browser: bool = True):

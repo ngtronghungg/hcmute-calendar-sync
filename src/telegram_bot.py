@@ -534,11 +534,11 @@ def record_cancellation_vote(
     broadcast_sent = False
     if just_confirmed and bot_token and len(users) > 1:
         alert_msg = (
-            f"🚨 <b>XÁC NHẬN NGHỈ HỌC CỘNG ĐỒNG (ZALO BÁO NGHỈ)</b>\n\n"
+            f"📢 <b>XÁC NHẬN GIẢNG VIÊN CHO NGHỈ (TỰ ĐỘNG XÓA LỊCH)</b>\n\n"
             f"📚 Môn học: <b>{course_title}</b>\n"
             f"⏰ Thời gian: <b>{time_str}</b>\n\n"
-            f"⚡ <i>Đã có {current_votes}/{total_students} sinh viên ({percent:.0f}%) đồng loạt báo nghỉ học.</i>\n\n"
-            f"✔ Hệ thống đã tự động xác nhận và <b>xóa buổi học này khỏi Google Calendar</b> của toàn bộ sinh viên!"
+            f"👥 <i>Đã có {current_votes}/{total_students} sinh viên ({percent:.0f}%) cùng xác nhận Giảng viên cho nghỉ môn này.</i>\n\n"
+            f"✔ Hệ thống đã tự động xác nhận và <b>xóa buổi học này khỏi Lịch</b> của toàn bộ sinh viên!"
         )
         for chat_id, u in users.items():
             if u.get("active", True) and str(chat_id) != voter_str:
@@ -586,7 +586,7 @@ def remove_cancellation_vote(class_uid: str, voter_id: str, bot_token: Optional[
                 f"↩️ <b>THÔNG BÁO: KHÔI PHỤC LẠI BUỔI HỌC</b>\n\n"
                 f"📚 Môn: <b>{entry.get('title', 'Buổi học')}</b>\n"
                 f"⏰ Thời gian: <b>{entry.get('time_str', '')}</b>\n\n"
-                f"✔ Số lượt báo nghỉ đã giảm xuống dưới {threshold_percent}%. Buổi học đã được khôi phục trở lại vào Google Calendar!"
+                f"✔ Số lượt xác nhận đã giảm xuống dưới {threshold_percent}%. Buổi học đã được khôi phục trở lại vào Lịch!"
             )
             for chat_id, u in users.items():
                 if u.get("active", True):
@@ -699,7 +699,7 @@ MAIN_INLINE_KEYBOARD = {
         ],
         [
             {"text": "🎯 Lịch thi", "callback_data": "action_thi"},
-            {"text": "❌ Báo nghỉ môn", "callback_data": "action_nghi"},
+            {"text": "🏖️ GV cho nghỉ môn", "callback_data": "action_nghi"},
         ],
         [
             {"text": "👤 Hồ sơ MSSV", "callback_data": "action_me"},
@@ -1245,16 +1245,16 @@ def _send_cancellation_picker(bot_token: str, chat_id: str, client: HCMUTEClient
             v_entry = votes_db.get(c.uid, {})
             v_count = len(v_entry.get("voters", []))
             if c.uid in cancelled_set:
-                buttons.append([{"text": f"✅ {title_short} ({when}) - ĐÃ NGHỈ", "callback_data": f"restore_class:{c.uid}"}])
+                buttons.append([{"text": f"✅ {title_short} ({when}) - GV CHO NGHỈ", "callback_data": f"restore_class:{c.uid}"}])
             else:
                 vote_badge = f" [🗳️ {v_count}/{users_cnt}]" if (v_count > 0 and users_cnt > 1) else ""
-                buttons.append([{"text": f"❌ Báo nghỉ: {title_short} ({when}){vote_badge}", "callback_data": f"cancel_class:{c.uid}"}])
+                buttons.append([{"text": f"🏖️ GV cho nghỉ: {title_short} ({when}){vote_badge}", "callback_data": f"cancel_class:{c.uid}"}])
 
         reply_markup = {"inline_keyboard": buttons}
         send_telegram_message(
             bot_token,
             chat_id,
-            "👇 <b>Chọn buổi học giảng viên báo nghỉ để tự động xóa khỏi Google Calendar:</b>",
+            "🏖️ <b>Chọn buổi học Giảng viên cho nghỉ để tự động xóa khỏi Google / Apple Calendar:</b>",
             reply_markup=reply_markup
         )
 
@@ -1263,7 +1263,7 @@ def _send_restore_picker(bot_token: str, chat_id: str):
     """Present 1-tap buttons to restore previously cancelled classes."""
     cancelled_set = load_cancellations()
     if not cancelled_set:
-        send_telegram_message(bot_token, chat_id, "✔ Hiện không có môn nào đang ở trạng thái báo nghỉ.", reply_markup=MAIN_INLINE_KEYBOARD)
+        send_telegram_message(bot_token, chat_id, "✔ Hiện không có môn nào đang ở trạng thái Giảng viên cho nghỉ.", reply_markup=MAIN_INLINE_KEYBOARD)
     else:
         all_events = load_feed_cache()
         ev_map = {e.uid: e for e in all_events}
@@ -1402,11 +1402,11 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
                     except Exception:
                         pass
                 msg_txt = (
-                    f"🗳️ <b>ĐÃ GHI NHẬN Ý KIẾN BÁO NGHỈ CỦA BẠN!</b>\n\n"
+                    f"🗳️ <b>ĐÃ GHI NHẬN: GIẢNG VIÊN CHO NGHỈ!</b>\n\n"
                     f"📚 Môn: <b>{res.get('title')}</b>\n"
                     f"⏰ Thời gian: <b>{res.get('time_str')}</b>\n"
                     f"📊 Tiến độ xác nhận: <b>{res.get('votes')}/{res.get('needed')} bạn ({res.get('percent'):.0f}%)</b>\n\n"
-                    f"<i>Khi đạt tỉ lệ {res.get('threshold')}% sinh viên cùng lớp báo nghỉ (thầy nhắn qua Zalo), bot sẽ tự động thông báo đến tất cả mọi người và xóa buổi học khỏi Google Calendar!</i>"
+                    f"<i>Khi đạt tỉ lệ {res.get('threshold')}% sinh viên cùng lớp xác nhận (thầy/cô nhắn qua Zalo/LMS), bot sẽ tự động thông báo đến tất cả mọi người và xóa buổi học khỏi Lịch!</i>"
                 )
                 send_telegram_message(bot_token, user_chat_id, msg_txt, reply_markup=MAIN_INLINE_KEYBOARD)
 
@@ -1417,7 +1417,7 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
                 try:
                     requests.post(
                         f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
-                        json={"callback_query_id": cb_id, "text": "✔ Đã hủy biểu quyết báo nghỉ!"},
+                        json={"callback_query_id": cb_id, "text": "✔ Đã hủy xác nhận nghỉ học!"},
                         timeout=2
                     )
                 except Exception:
@@ -1425,7 +1425,7 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
             send_telegram_message(
                 bot_token,
                 user_chat_id,
-                "✅ <b>Đã hủy biểu quyết báo nghỉ!</b>\nBuổi học đã được khôi phục trở lại vào lịch của bạn.",
+                "✅ <b>Đã hủy xác nhận nghỉ học!</b>\nBuổi học đã được khôi phục trở lại vào lịch của bạn.",
                 reply_markup=MAIN_INLINE_KEYBOARD
             )
 

@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#09090b">
-  <title>HCMUTE Calendar & Reminder Sync</title>
+  <title>UTECal - HCMUTE Calendar & Sync</title>
   <style>
     :root {
       --bg: #09090b;
@@ -181,7 +181,7 @@
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .user-pill {
@@ -194,6 +194,17 @@
       border-radius: var(--radius-full);
       font-size: 12px;
       font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .user-pill:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--surface-border-strong);
+    }
+    .user-pill:active {
+      transform: scale(0.97);
     }
     .user-dot {
       width: 7px;
@@ -201,6 +212,32 @@
       background: var(--accent-emerald);
       border-radius: 50%;
       box-shadow: 0 0 8px var(--accent-emerald);
+    }
+
+    .logout-pill {
+      background: rgba(255, 59, 48, 0.12);
+      border: 1px solid rgba(255, 59, 48, 0.35);
+      color: #ff6b6b;
+      padding: 5px 12px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .logout-pill:hover {
+      background: rgba(255, 59, 48, 0.25);
+      border-color: rgba(255, 59, 48, 0.6);
+      color: #fff;
+    }
+    .logout-pill:active {
+      transform: scale(0.96);
     }
 
     .btn-icon {
@@ -430,6 +467,321 @@
       padding: 2px 7px;
       border-radius: var(--radius-sm);
       margin-left: auto;
+    }
+
+    /* ==========================================================================
+       CALENDAR APPLICATION SUITE (APPLE CALENDAR / GOOGLE TIMETABLE DESIGN)
+       ========================================================================== */
+    .calendar-nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+      background: rgba(22, 22, 26, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
+      padding: 10px 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+    .cal-nav-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .cal-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--surface-border);
+      color: #fff;
+      padding: 7px 12px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .cal-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--surface-border-strong);
+      transform: translateY(-1px);
+    }
+    .cal-btn.today-btn {
+      background: rgba(14, 165, 233, 0.15);
+      border-color: rgba(14, 165, 233, 0.4);
+      color: #38bdf8;
+    }
+    .cal-btn.today-btn:hover {
+      background: rgba(14, 165, 233, 0.25);
+    }
+    .cal-week-display {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 6px;
+    }
+
+    .cal-view-switcher {
+      display: flex;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-full);
+      padding: 3px;
+      gap: 3px;
+    }
+    .cal-view-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .cal-view-btn:hover {
+      color: #fff;
+    }
+    .cal-view-btn.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Mobile Day Strip */
+    .mobile-day-strip {
+      display: none;
+    }
+
+    /* Matrix Table Design */
+    .schedule-matrix-container {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--surface-border);
+      background: var(--surface);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+      margin-bottom: 24px;
+    }
+    .matrix-table {
+      width: 100%;
+      min-width: 900px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .matrix-th {
+      padding: 14px 8px;
+      text-align: center;
+      border-bottom: 1px solid var(--surface-border);
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.02);
+      vertical-align: middle;
+    }
+    .matrix-th:last-child {
+      border-right: none;
+    }
+    .matrix-th.today-col {
+      background: rgba(14, 165, 233, 0.08);
+      border-bottom: 2px solid #0ea5e9;
+    }
+    .matrix-session-th {
+      width: 120px;
+      padding: 16px 12px;
+      text-align: center;
+      border-right: 1px solid var(--surface-border);
+      border-bottom: 1px solid var(--surface-border);
+      background: rgba(0, 0, 0, 0.25);
+      vertical-align: middle;
+    }
+    .matrix-td {
+      padding: 10px;
+      vertical-align: top;
+      border-right: 1px solid rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid var(--surface-border);
+      min-height: 140px;
+      height: 140px;
+      background: rgba(0, 0, 0, 0.1);
+      transition: background 0.2s;
+    }
+    .matrix-td:last-child {
+      border-right: none;
+    }
+    .matrix-td.today-col {
+      background: rgba(14, 165, 233, 0.03);
+    }
+    .matrix-td:hover {
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    /* Matrix Event Chip */
+    .matrix-card-chip {
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left-width: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      position: relative;
+    }
+    .matrix-card-chip:hover {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.09);
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .matrix-card-chip.cancelled {
+      opacity: 0.65;
+      border-left-color: #ef4444 !important;
+    }
+    .matrix-chip-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      line-height: 1.35;
+      color: #fff;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .matrix-chip-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    /* Day View Container */
+    .schedule-day-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .day-view-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
+    }
+    .day-view-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--surface-border);
+      margin-bottom: 14px;
+    }
+    .day-view-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .day-session-section {
+      margin-bottom: 14px;
+    }
+    .day-session-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    @media (max-width: 860px) {
+      .mobile-day-strip {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 4px 2px 12px;
+        margin-bottom: 12px;
+        -webkit-overflow-scrolling: touch;
+      }
+      .mobile-day-btn {
+        flex: 1 0 auto;
+        min-width: 62px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 8px 6px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--surface-border);
+        border-radius: var(--radius-md);
+        font-size: 11px;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+        user-select: none;
+      }
+      .mobile-day-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .mobile-day-btn.active {
+        background: rgba(14, 165, 233, 0.18);
+        border-color: rgba(14, 165, 233, 0.45);
+        color: #38bdf8;
+        font-weight: 700;
+      }
+      .mobile-day-btn.is-today {
+        border-color: #0ea5e9;
+      }
+      .calendar-nav-bar {
+        padding: 10px 12px;
+      }
+      .cal-week-display {
+        font-size: 12px;
+        width: 100%;
+        margin-left: 0;
+        margin-top: 4px;
+      }
+      .cal-view-switcher {
+        width: 100%;
+        justify-content: space-around;
+        margin-top: 6px;
+      }
+      .cal-view-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 6px 8px;
+        font-size: 11px;
+      }
     }
 
     /* Consideration / Reminders Cards */
@@ -765,6 +1117,34 @@
     .tab-text-short { display: none; }
     .tab-text-full { display: inline; }
 
+    .fb-cat-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+      user-select: none;
+    }
+    .fb-cat-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+    .fb-cat-btn.active {
+      background: rgba(14, 165, 233, 0.16);
+      border-color: rgba(14, 165, 233, 0.45);
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
     /* ==========================================================================
        MOBILE & RESPONSIVE PERFECTION (iOS Safari & Android Chrome)
        ========================================================================== */
@@ -788,14 +1168,19 @@
         font-size: 11px;
       }
       .user-pill {
-        padding: 4px 10px;
+        padding: 4px 8px;
         font-size: 11px;
-        max-width: 130px;
+        max-width: 110px;
       }
       .user-pill span:last-child {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      .logout-pill {
+        padding: 4px 8px;
+        font-size: 11px;
+        gap: 4px;
       }
       .btn-icon {
         width: 36px;
@@ -967,7 +1352,7 @@
     <a href="#" class="brand">
       <div class="glyph">UTE</div>
       <div>
-        <div class="brand-title">HCMUTE Sync</div>
+        <div class="brand-title">UTECal</div>
         <div class="brand-subtitle">online.hcmute.edu.vn</div>
       </div>
     </a>
@@ -995,16 +1380,21 @@
         <span class="tab-icon">⚡</span>
         <span class="tab-text">Đồng bộ</span>
       </button>
+      <button class="tab-btn" onclick="switchTab('feedback')">
+        <span class="tab-icon">💡</span>
+        <span class="tab-text"><span class="tab-text-full">Gợi ý</span><span class="tab-text-short">Góp ý</span></span>
+      </button>
     </nav>
 
     <!-- Header Actions -->
     <div class="header-actions">
-      <div class="user-pill hidden" id="userPill">
+      <div class="user-pill hidden" id="userPill" onclick="confirmLogout()" title="Chạm để xem thông tin hoặc đăng xuất">
         <span class="user-dot"></span>
         <span id="userNameDisplay">Sinh viên</span>
       </div>
-      <button class="btn-icon hidden" id="logoutBtn" onclick="handleLogout()" title="Đăng xuất">
-        🚪
+      <button class="logout-pill hidden" id="logoutBtn" onclick="confirmLogout()" title="Đăng xuất khỏi thiết bị">
+        <span>🚪</span>
+        <span class="logout-text">Đăng xuất</span>
       </button>
     </div>
   </header>
@@ -1015,7 +1405,7 @@
     <!-- 1. LOGIN VIEW -->
     <div class="login-wrapper hidden" id="loginView">
       <div class="login-icon">🎓</div>
-      <h1 class="login-title">HCMUTE Sync</h1>
+      <h1 class="login-title">UTECal</h1>
       <p class="login-desc">Đồng bộ thời khóa biểu và lịch thi vào điện thoại</p>
 
       <div class="banner banner-error hidden" id="loginError"></div>
@@ -1062,11 +1452,14 @@
         </form>
       </div>
 
-      <div style="margin-top: 20px; text-align: center;">
+      <div style="margin-top: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px;">
         <button type="button" onclick="openSecurityModal()" style="background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-muted)'">
           <span>🔒</span>
           <span>Bảo mật 100% • Không lưu mật khẩu</span>
         </button>
+        <div style="font-size: 11px; color: var(--text-subtle);">
+          tool by <a href="https://github.com/tronghunh" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none; font-weight: 500;" onmouseover="this.style.color='#fff'; this.style.textDecoration='underline'" onmouseout="this.style.color='var(--text-muted)'; this.style.textDecoration='none'">@tronghunh</a>
+        </div>
       </div>
     </div>
 
@@ -1079,20 +1472,23 @@
 
       <!-- TAB 1: SCHEDULE (THỜI KHÓA BIỂU) -->
       <section id="scheduleTab">
-        <div class="dashboard-header">
+        
+        <!-- Top Toolbar & Semester Selectors -->
+        <div class="dashboard-header" style="flex-wrap: wrap; gap: 14px; margin-bottom: 18px;">
           <div>
-            <h2 class="section-title">Thời khóa biểu</h2>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h2 class="section-title">Thời khóa biểu</h2>
+              <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-blue); border: 1px solid rgba(14, 165, 233, 0.3); font-size: 11px;">
+                Lịch Học UTE
+              </span>
+            </div>
             <p class="section-subtitle" id="semesterSubtitle">Học kỳ hiện tại</p>
           </div>
-          <div class="header-actions" style="flex-wrap: wrap;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--surface-border); padding: 6px 14px; border-radius: var(--radius-full); cursor: pointer; user-select: none;">
-              <input type="checkbox" id="onlyUpcomingScheduleToggle" checked onchange="toggleSchedulePast(this.checked)" style="accent-color: var(--accent-red); width: 14px; height: 14px;">
-              <span id="scheduleToggleLabel">Chỉ hiện sắp tới</span>
-            </label>
-            <select id="yearSelect" class="input-control" style="width: auto; padding: 6px 12px; font-size: 13px;" onchange="onSemesterChange()">
-            </select>
-            <select id="termSelect" class="input-control" style="width: auto; padding: 6px 12px; font-size: 13px;" onchange="onSemesterChange()">
-            </select>
+
+          <div class="header-actions" style="flex-wrap: wrap; gap: 8px;">
+            <select id="yearSelect" class="input-control" style="width: auto; padding: 6px 12px; font-size: 13px;" onchange="onSemesterChange()"></select>
+            <select id="termSelect" class="input-control" style="width: auto; padding: 6px 12px; font-size: 13px;" onchange="onSemesterChange()"></select>
+            
             <button class="btn-secondary" onclick="promptAddMakeupClass()" style="color: var(--accent-emerald);" title="Thêm lịch học bù">
               ➕ Học bù
             </button>
@@ -1105,9 +1501,68 @@
           </div>
         </div>
 
-        <div class="schedule-grid" id="scheduleGrid">
+        <!-- Calendar App Navigation Bar (Week Navigator & View Switcher) -->
+        <div class="calendar-nav-bar">
+          
+          <!-- Week Navigator Buttons -->
+          <div class="cal-nav-group">
+            <button class="cal-btn" onclick="navScheduleWeek(-1)" title="Tuần trước">
+              <span>◀</span>
+            </button>
+            <button class="cal-btn today-btn" onclick="navScheduleToday()" title="Trở về tuần này">
+              <span>Hôm nay</span>
+            </button>
+            <button class="cal-btn" onclick="navScheduleWeek(1)" title="Tuần sau">
+              <span>▶</span>
+            </button>
+            <div class="cal-week-display" id="calWeekDisplayTitle">
+              Đang tính toán tuần...
+            </div>
+          </div>
+
+          <!-- View Mode Segmented Switcher (Lưới Buổi | Từng Ngày | Danh Sách) -->
+          <div class="cal-view-switcher">
+            <button class="cal-view-btn active" id="btnViewMatrix" onclick="setScheduleViewMode('matrix')">
+              <span>📊 Lưới Buổi</span>
+            </button>
+            <button class="cal-view-btn" id="btnViewDay" onclick="setScheduleViewMode('day')">
+              <span>📅 Từng Ngày</span>
+            </button>
+            <button class="cal-view-btn" id="btnViewList" onclick="setScheduleViewMode('list')">
+              <span>📋 Danh Sách</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Mobile Day Selector Strip (For small screens) -->
+        <div class="mobile-day-strip" id="mobileDayStrip">
           <!-- Populated by JS -->
         </div>
+
+        <!-- 1. VIEW MODE: MATRIX (THỨ / BUỔI / TIẾT) -->
+        <div id="scheduleMatrixView" class="schedule-matrix-container">
+          <!-- Matrix Table generated by JS -->
+        </div>
+
+        <!-- 2. VIEW MODE: DAY TIMELINE -->
+        <div id="scheduleDayView" class="schedule-day-container hidden">
+          <!-- Day cards generated by JS -->
+        </div>
+
+        <!-- 3. VIEW MODE: AGENDA LIST (CLASSIC LIST) -->
+        <div id="scheduleListView" class="hidden">
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--surface-border); padding: 6px 14px; border-radius: var(--radius-full); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="onlyUpcomingScheduleToggle" onchange="toggleSchedulePast(this.checked)" style="accent-color: var(--accent-red); width: 14px; height: 14px;">
+              <span id="scheduleToggleLabel">Chỉ hiện sắp tới</span>
+            </label>
+          </div>
+          <div class="schedule-grid" id="scheduleGrid">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
       </section>
 
       <!-- TAB 2: REMINDERS & CONSIDERATION (NHẮC NHỞ HẠN CHÓT) -->
@@ -1206,7 +1661,7 @@
               🔥 <b>Cảnh báo</b> Lịch thi
             </div>
             <div style="padding: 6px 14px; background: rgba(255, 255, 255, 0.04); border-radius: var(--radius-full); border: 1px solid var(--surface-border);">
-              ❌ <b>Tự xóa</b> Khi báo nghỉ
+              🏖️ <b>Tự xóa</b> Khi GV cho nghỉ
             </div>
           </div>
         </div>
@@ -1274,6 +1729,25 @@
           </button>
         </div>
 
+        <!-- Account & Logout Card -->
+        <div class="card" style="margin-top: 24px; padding: 18px 20px; border-color: rgba(255, 59, 48, 0.22); background: rgba(255, 59, 48, 0.04);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+            <div>
+              <div style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                <span>👤</span>
+                <span id="syncUserFullTitle">Tài khoản sinh viên</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" id="syncUserMssvSubtitle">
+                Phiên đăng nhập an toàn (Zero-Knowledge)
+              </div>
+            </div>
+            <button class="logout-pill" onclick="confirmLogout()" style="padding: 8px 16px; font-size: 13px;">
+              <span>🚪</span>
+              <span>Đăng xuất tài khoản</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Hidden checkbox elements for JS sync logic compatibility -->
         <div style="display: none;">
           <input type="checkbox" id="syncOptClasses" checked>
@@ -1283,18 +1757,133 @@
         </div>
       </section>
 
+      <!-- 6. FEEDBACK & SUGGESTIONS TAB (AI 10-LEVEL EVALUATION) -->
+      <section id="feedbackTab" class="hidden">
+        <div class="schedule-header" style="margin-bottom: 24px;">
+          <div>
+            <div class="schedule-title" style="display: flex; align-items: center; gap: 8px;">
+              <span>💡 Hòm thư Gợi ý & Ý kiến</span>
+              <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-blue); border: 1px solid rgba(14, 165, 233, 0.3); font-size: 11px;">AI Thẩm định 10 cấp độ</span>
+            </div>
+            <div class="schedule-date" style="margin-top: 4px;">
+              Mọi ý kiến của bạn đều được AI tự động phân tích và xếp thứ tự ưu tiên gửi trực tiếp tới Ban Quản trị UTECal.
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+          
+          <!-- Column 1: Submission Form -->
+          <div class="card" style="box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+            <div style="font-weight: 600; font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+              <span>✍️</span>
+              <span>Gửi ý kiến đóng góp mới</span>
+            </div>
+
+            <form id="feedbackForm" onsubmit="handleFeedbackSubmit(event)">
+              <!-- Category Selector -->
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">Phân loại ý kiến</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="feedbackCategoryGroup">
+                  <label class="fb-cat-btn active" onclick="selectFbCategory('feature', this)">
+                    <input type="radio" name="fbCategory" value="feature" checked style="display: none;">
+                    <span>🚀 Tính năng mới</span>
+                  </label>
+                  <label class="fb-cat-btn" onclick="selectFbCategory('bug', this)">
+                    <input type="radio" name="fbCategory" value="bug" style="display: none;">
+                    <span>🐛 Báo lỗi / Sự cố</span>
+                  </label>
+                  <label class="fb-cat-btn" onclick="selectFbCategory('ui', this)">
+                    <input type="radio" name="fbCategory" value="ui" style="display: none;">
+                    <span>🎨 Giao diện & UX</span>
+                  </label>
+                  <label class="fb-cat-btn" onclick="selectFbCategory('other', this)">
+                    <input type="radio" name="fbCategory" value="other" style="display: none;">
+                    <span>💬 Ý kiến khác</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Title -->
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">Tiêu đề ngắn gọn</label>
+                <input type="text" id="fbInputTitle" class="input-control" placeholder="Tóm tắt ý kiến (VD: Thêm widget đếm ngược ngày thi)..." maxlength="120" required>
+              </div>
+
+              <!-- Content -->
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">Nội dung chi tiết</label>
+                <textarea id="fbInputContent" class="input-control" rows="4" placeholder="Mô tả cụ thể mong muốn, hoàn cảnh sử dụng hoặc lỗi gặp phải..." required style="resize: vertical; font-size: 13px;"></textarea>
+              </div>
+
+              <!-- Anonymity Checkbox -->
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding: 10px 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: var(--radius-sm);">
+                <div>
+                  <div style="font-size: 12px; font-weight: 500;">Gửi ẩn danh</div>
+                  <div style="font-size: 11px; color: var(--text-subtle);">Không hiển thị công khai họ tên của bạn</div>
+                </div>
+                <label class="ios-switch">
+                  <input type="checkbox" id="fbInputAnonymous">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <!-- Submit Button -->
+              <button type="submit" class="btn-primary" id="fbSubmitBtn" style="width: 100%; justify-content: center; padding: 12px;">
+                <span>Gửi góp ý cho AI thẩm định</span>
+                <span>➔</span>
+              </button>
+            </form>
+
+            <!-- Instant AI Evaluation Banner -->
+            <div id="fbAiResultBanner" class="hidden" style="margin-top: 16px; padding: 14px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md);">
+              <div style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: #34d399; margin-bottom: 6px;">
+                <span style="display: flex; align-items: center; gap: 6px;">
+                  <span>🤖</span>
+                  <span>AI đã tiếp nhận & xếp hạng</span>
+                </span>
+                <span id="fbAiResultLevelBadge" class="badge" style="font-size: 11px; padding: 2px 8px;">Cấp 3</span>
+              </div>
+              <div id="fbAiResultSummary" style="font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 6px;"></div>
+              <div id="fbAiResultReco" style="font-size: 11px; color: var(--text-muted); font-style: italic;"></div>
+            </div>
+          </div>
+
+          <!-- Column 2: Previous Submissions -->
+          <div class="card" style="box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <div style="font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                <span>📋</span>
+                <span>Lịch sử góp ý của bạn</span>
+              </div>
+              <button class="btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="loadMyFeedbacks()">
+                <span>🔄 Làm mới</span>
+              </button>
+            </div>
+
+            <div id="myFeedbacksContainer" style="display: flex; flex-direction: column; gap: 12px; max-height: 520px; overflow-y: auto; padding-right: 4px;">
+              <div style="text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 13px;">
+                Chưa có ý kiến nào được gửi. Hãy chia sẻ đóng góp của bạn để hoàn thiện UTECal nhé!
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
     </div>
 
     <!-- Clean Minimalist Footer -->
     <footer style="margin-top: 48px; padding: 24px 0 16px; border-top: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-subtle);">
-      <div>HCMUTE Sync • Cổng đào tạo sinh viên</div>
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <button type="button" onclick="openSecurityModal()" style="background: none; border: none; color: var(--text-subtle); font-size: 12px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-subtle)'">
-          🔒 Bảo mật & Quyền riêng tư
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <button type="button" onclick="openSecurityModal()" style="background: none; border: none; color: var(--text-subtle); font-size: 12px; cursor: pointer; transition: color 0.2s; padding: 0; display: inline-flex; align-items: center; gap: 4px;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-subtle)'">
+          <span>🔒 Bảo mật & Quyền riêng tư</span>
         </button>
-        <a href="/admin" target="_blank" style="color: var(--text-subtle); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-subtle)'">
-          Quản trị
-        </a>
+        <span>•</span>
+        <span>tool by <a href="https://github.com/tronghunh" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none; font-weight: 500;" onmouseover="this.style.color='#fff'; this.style.textDecoration='underline'" onmouseout="this.style.color='var(--text-muted)'; this.style.textDecoration='none'">@tronghunh</a></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <span>UTECal</span>
       </div>
     </footer>
 
@@ -1325,7 +1914,7 @@
       <div class="modal-header">
         <div>
           <h3 class="modal-title">Bảo mật & Quyền riêng tư</h3>
-          <div class="modal-meta">Kiến trúc Zero-Knowledge</div>
+          <div class="modal-meta">Kiến trúc Zero-Knowledge • Tool by @tronghunh</div>
         </div>
         <button class="btn-icon" onclick="closeSecurityModal()" title="Đóng">✕</button>
       </div>
@@ -1366,6 +1955,92 @@
     </div>
   </div>
 
+  <!-- User Profile & Logout Modal (Apple Style) -->
+  <div class="modal-overlay" id="userProfileModal" onclick="closeUserProfileModal(event)">
+    <div class="modal-card" style="max-width: 440px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Tài khoản sinh viên</h3>
+          <div class="modal-meta" id="modalUserRole">Sinh viên HCMUTE</div>
+        </div>
+        <button class="btn-icon" onclick="closeUserProfileModal()" title="Đóng">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--surface-border-strong); display: flex; align-items: center; justify-content: center; font-size: 26px;">
+            🎓
+          </div>
+          <div>
+            <div style="font-size: 17px; font-weight: 700;" id="modalUserName">Đang tải...</div>
+            <div style="font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;" id="modalUserMssv">MSSV: ...</div>
+          </div>
+        </div>
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+          <div>Trạng thái: <span style="color: #4ade80; font-weight: 600;" id="modalUserStatus">Đang học</span></div>
+          <div style="margin-top: 4px;">Kiến trúc: <span style="color: #4ade80;">Bảo mật Zero-Knowledge (Mật khẩu tự hủy khỏi RAM)</span></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button class="btn-primary" style="background: rgba(255, 59, 48, 0.2); border: 1px solid rgba(255, 59, 48, 0.45); color: #ff6b6b; justify-content: center;" onclick="executeLogout()">
+            <span>🚪 Đăng xuất khỏi thiết bị này</span>
+          </button>
+          <button class="btn-secondary" style="justify-content: center;" onclick="closeUserProfileModal()">
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Class Detail Modal (Apple Calendar Inspector Style) -->
+  <div class="modal-overlay" id="classDetailModal" onclick="closeClassDetailModal(event)">
+    <div class="modal-card" style="max-width: 480px;" onclick="event.stopPropagation()">
+      <div class="modal-header" style="align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div id="modalClassColorDot" style="width: 14px; height: 14px; border-radius: 50%; background: var(--accent-blue); flex-shrink: 0;"></div>
+          <div>
+            <h3 class="modal-title" id="modalClassTitle" style="font-size: 16px;">Tên môn học</h3>
+            <div class="modal-meta" id="modalClassCode">MÔN HỌC</div>
+          </div>
+        </div>
+        <button class="btn-icon" onclick="closeClassDetailModal()" title="Đóng">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px; font-size: 13px; line-height: 1.6; display: flex; flex-direction: column; gap: 14px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: var(--text-muted);">📅 Ngày & Thứ:</span>
+            <strong id="modalClassDayStr" style="color: #fff;">Thứ Hai, 20/10/2026</strong>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: var(--text-muted);">⏰ Buổi & Giờ học:</span>
+            <strong id="modalClassTimeStr" style="color: #38bdf8;">Buổi Sáng • 07:30 - 11:30</strong>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: var(--text-muted);">📍 Phòng học:</span>
+            <span id="modalClassRoom" class="room-badge" style="font-weight: 700;">A1-205</span>
+          </div>
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
+            <span style="color: var(--text-muted);">🏢 Địa điểm / Cơ sở:</span>
+            <span id="modalClassLocation" style="color: var(--text); text-align: right;">Cơ sở chính</span>
+          </div>
+        </div>
+
+        <div id="modalClassDescBox" style="background: rgba(255,255,255,0.02); border: 1px solid var(--surface-border); border-radius: 12px; padding: 12px; font-size: 12px; color: var(--text-muted); white-space: pre-line;"></div>
+
+        <div id="modalClassStatusAlert" class="hidden" style="padding: 10px 14px; border-radius: 8px; font-size: 12px;"></div>
+
+        <div style="display: flex; gap: 10px; margin-top: 6px;">
+          <button id="modalClassCancelBtn" class="btn-secondary" style="flex: 1; padding: 10px; justify-content: center; font-size: 13px;">
+            🏖️ Đánh dấu GV cho nghỉ
+          </button>
+          <button class="btn-primary" style="padding: 10px 18px;" onclick="closeClassDetailModal()">
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     let appState = {
       authenticated: false,
@@ -1375,10 +2050,30 @@
       considerations: [],
       selectedReminderIds: new Set(),
       currentTab: 'schedule',
-      includePastSchedule: false,
+      includePastSchedule: true,
       includePastExams: false,
       overviewData: null,
+      scheduleViewMode: 'matrix',
+      currentWeekMonday: null,
+      selectedDayIndex: (new Date().getDay() + 6) % 7,
     };
+
+    // Centralized Authenticated Fetch Wrapper
+    async function apiFetch(url, options = {}) {
+      const token = localStorage.getItem('hcmute_session_token') || '';
+      options.headers = {
+        ...(options.headers || {}),
+        'X-Session-Token': token
+      };
+      const res = await fetch(url, options);
+      if (res.status === 401 && !url.includes('/api/login')) {
+        localStorage.removeItem('hcmute_session_token');
+        appState.authenticated = false;
+        appState.profile = null;
+        showLogin();
+      }
+      return res;
+    }
 
     // Initialize application on load
     window.addEventListener('DOMContentLoaded', async () => {
@@ -1386,23 +2081,30 @@
     });
 
     async function checkAuthStatus() {
+      const token = localStorage.getItem('hcmute_session_token');
+      // If no session token stored in browser, directly show clean login screen (Zero Data Leak)
+      if (!token) {
+        showLogin();
+        return;
+      }
+
       try {
-        const res = await fetch('/api/status');
+        const res = await apiFetch('/api/status');
         let data;
         try {
           data = await res.json();
         } catch(e) {
-          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
-          errorDiv.classList.remove('hidden');
+          showLogin();
           return;
         }
-        if (data.authenticated) {
+        if (data.authenticated && data.profile) {
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
           await loadOverviewData();
           await loadConsiderations();
         } else {
+          localStorage.removeItem('hcmute_session_token');
           showLogin();
         }
       } catch (err) {
@@ -1428,7 +2130,53 @@
       if (appState.profile) {
         document.getElementById('userNameDisplay').textContent =
           `${appState.profile.name} (${appState.profile.id})`;
+        const syncTitle = document.getElementById('syncUserFullTitle');
+        if (syncTitle) syncTitle.textContent = `${appState.profile.name}`;
+        const syncSub = document.getElementById('syncUserMssvSubtitle');
+        if (syncSub) syncSub.textContent = `MSSV: ${appState.profile.id} • ${appState.profile.status || 'Đang học'}`;
       }
+    }
+
+    function confirmLogout() {
+      openUserProfileModal();
+    }
+
+    function openUserProfileModal() {
+      if (!appState.profile) return;
+      document.getElementById('modalUserName').textContent = appState.profile.name || 'Sinh viên';
+      document.getElementById('modalUserMssv').textContent = `MSSV: ${appState.profile.id || ''}`;
+      document.getElementById('modalUserRole').textContent = `Vai trò: ${appState.profile.role || 'SV'}`;
+      document.getElementById('modalUserStatus').textContent = appState.profile.status || 'Đang học';
+      const m = document.getElementById('userProfileModal');
+      if (m) m.classList.add('open');
+    }
+
+    function closeUserProfileModal(e) {
+      if (e && e.target !== e.currentTarget && !e.target.classList.contains('btn-icon') && !e.target.classList.contains('btn-secondary')) return;
+      const m = document.getElementById('userProfileModal');
+      if (m) m.classList.remove('open');
+    }
+
+    async function executeLogout() {
+      closeUserProfileModal();
+      try {
+        await apiFetch('/api/logout', { method: 'POST' });
+      } catch {}
+      localStorage.removeItem('hcmute_session_token');
+      localStorage.clear();
+      sessionStorage.clear();
+      document.cookie = "hcmute_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      appState.authenticated = false;
+      appState.profile = null;
+      appState.classes = [];
+      appState.exams = [];
+      appState.considerations = [];
+      showLogin();
+      window.location.replace('/');
+    }
+
+    async function handleLogout() {
+      executeLogout();
     }
 
     async function handleLogin(e) {
@@ -1457,7 +2205,8 @@
           return;
         }
 
-        if (data.success) {
+        if (data.success && data.session_token) {
+          localStorage.setItem('hcmute_session_token', data.session_token);
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
@@ -1474,15 +2223,6 @@
         btn.disabled = false;
         btn.innerHTML = `<span>Đăng nhập</span>`;
       }
-    }
-
-    async function handleLogout() {
-      try {
-        await fetch('/api/logout', { method: 'POST' });
-      } catch {}
-      appState.authenticated = false;
-      appState.profile = null;
-      showLogin();
     }
 
     function toggleLoginMode(mode) {
@@ -1532,7 +2272,8 @@
           errorDiv.classList.remove('hidden');
           return;
         }
-        if (data.success) {
+        if (data.success && data.session_token) {
+          localStorage.setItem('hcmute_session_token', data.session_token);
           appState.authenticated = true;
           appState.profile = data.profile;
           showDashboard();
@@ -1565,7 +2306,7 @@
     async function wipeMyData() {
       if (!confirm('Bạn có chắc chắn muốn xóa sạch toàn bộ phiên đăng nhập và dữ liệu lịch trên máy chủ? Bạn sẽ được đưa về màn hình đăng nhập.')) return;
       try {
-        await fetch('/api/security/wipe-my-data', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        await apiFetch('/api/security/wipe-my-data', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         closeSecurityModal();
         handleLogout();
         alert('✔ Toàn bộ dữ liệu của bạn đã được xóa sạch hoàn toàn khỏi hệ thống (0 byte còn lại).');
@@ -1587,6 +2328,8 @@
       document.getElementById('examsTab').classList.add('hidden');
       document.getElementById('telegramTab').classList.add('hidden');
       document.getElementById('syncTab').classList.add('hidden');
+      const fbTab = document.getElementById('feedbackTab');
+      if (fbTab) fbTab.classList.add('hidden');
 
       if (tabName === 'schedule') document.getElementById('scheduleTab').classList.remove('hidden');
       if (tabName === 'reminders') document.getElementById('remindersTab').classList.remove('hidden');
@@ -1597,6 +2340,10 @@
       }
       if (tabName === 'sync') {
         document.getElementById('syncTab').classList.remove('hidden');
+      }
+      if (tabName === 'feedback') {
+        if (fbTab) fbTab.classList.remove('hidden');
+        loadMyFeedbacks();
       }
     }
 
@@ -1622,7 +2369,7 @@
         const includePastExams = appState.includePastExams ? 'true' : 'false';
         const url = `/api/overview?year=${encodeURIComponent(yearVal)}&term=${encodeURIComponent(termVal)}&include_past=${includePast}&include_past_exams=${includePastExams}`;
 
-        const res = await fetch(url);
+        const res = await apiFetch(url);
         let data;
         try {
           data = await res.json();
@@ -1666,7 +2413,7 @@
             appState.includePastExams ? `Hiện tất cả (${totalExams})` : `Chỉ hiện môn sắp thi (${upExams})`;
         }
 
-        renderScheduleGrid(appState.classes);
+        renderScheduleCalendar();
         renderExamsGrid(appState.exams);
       } catch (err) {
         grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Không thể tải TKB: ${err.message}</div>`;
@@ -1701,10 +2448,378 @@
       return palette[Math.abs(h) % palette.length];
     }
 
+    // ==========================================
+    // CALENDAR APP ENGINE (THỨ / BUỔI / TUẦN)
+    // ==========================================
+
+    function getMonday(d) {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(date.setDate(diff));
+      monday.setHours(0, 0, 0, 0);
+      return monday;
+    }
+
+    function formatDateShort(d) {
+      return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    }
+
+    function navScheduleWeek(offset) {
+      if (!appState.currentWeekMonday) {
+        appState.currentWeekMonday = getMonday(new Date());
+      }
+      appState.currentWeekMonday.setDate(appState.currentWeekMonday.getDate() + offset * 7);
+      renderScheduleCalendar();
+    }
+
+    function navScheduleToday() {
+      appState.currentWeekMonday = getMonday(new Date());
+      appState.selectedDayIndex = (new Date().getDay() + 6) % 7;
+      renderScheduleCalendar();
+    }
+
+    function setScheduleViewMode(mode) {
+      appState.scheduleViewMode = mode;
+      document.getElementById('btnViewMatrix')?.classList.toggle('active', mode === 'matrix');
+      document.getElementById('btnViewDay')?.classList.toggle('active', mode === 'day');
+      document.getElementById('btnViewList')?.classList.toggle('active', mode === 'list');
+
+      document.getElementById('scheduleMatrixView')?.classList.toggle('hidden', mode !== 'matrix');
+      document.getElementById('scheduleDayView')?.classList.toggle('hidden', mode !== 'day');
+      document.getElementById('scheduleListView')?.classList.toggle('hidden', mode !== 'list');
+
+      renderScheduleCalendar();
+    }
+
+    function setMobileDay(idx) {
+      appState.selectedDayIndex = idx;
+      renderScheduleCalendar();
+    }
+
+    function renderScheduleCalendar() {
+      if (!appState.currentWeekMonday) {
+        appState.currentWeekMonday = getMonday(new Date());
+      }
+
+      const mon = new Date(appState.currentWeekMonday);
+      const sun = new Date(mon.getTime() + 6 * 86400000);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const isCurrentWeek = now >= mon && now <= new Date(sun.getTime() + 86399999);
+
+      // 1. Update Title in Navigation bar
+      const displayTitle = document.getElementById('calWeekDisplayTitle');
+      if (displayTitle) {
+        const monStr = formatDateShort(mon);
+        const sunStr = formatDateShort(sun);
+        const yearStr = mon.getFullYear();
+        displayTitle.innerHTML = `
+          <span>Tuần: <strong>${monStr} – ${sunStr}/${yearStr}</strong></span>
+          ${isCurrentWeek ? '<span class="badge" style="background: rgba(14, 165, 233, 0.2); color: #38bdf8; font-size: 10px; padding: 2px 7px;">● Tuần này</span>' : ''}
+        `;
+      }
+
+      // 2. Render Mobile Day Selector Strip
+      const dayShorts = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+      const dayStrip = document.getElementById('mobileDayStrip');
+      if (dayStrip) {
+        dayStrip.innerHTML = dayShorts.map((shortName, i) => {
+          const d = new Date(mon.getTime() + i * 86400000);
+          const isToday = d.getTime() === now.getTime();
+          const isActive = i === appState.selectedDayIndex;
+          return `
+            <div class="mobile-day-btn ${isActive ? 'active' : ''} ${isToday ? 'is-today' : ''}" onclick="setMobileDay(${i})">
+              <span style="font-weight: 700;">${shortName}</span>
+              <span style="font-size: 10px;">${d.getDate()}/${d.getMonth() + 1}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 3. Render Views based on mode
+      if (appState.scheduleViewMode === 'matrix') {
+        renderScheduleMatrix();
+      } else if (appState.scheduleViewMode === 'day') {
+        renderScheduleDayView();
+      } else if (appState.scheduleViewMode === 'list') {
+        renderScheduleGrid(appState.classes);
+      }
+    }
+
+    function renderScheduleMatrix() {
+      const container = document.getElementById('scheduleMatrixView');
+      if (!container) return;
+
+      const mon = new Date(appState.currentWeekMonday);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
+      const dayDates = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(mon.getTime() + i * 86400000);
+        dayDates.push(d);
+      }
+
+      // 3 Sessions per day
+      const sessions = [
+        { id: 'morning', name: 'Buổi Sáng', period: 'Tiết 1 – 6', time: '07:00 – 11:30', icon: '🌅' },
+        { id: 'afternoon', name: 'Buổi Chiều', period: 'Tiết 7 – 12', time: '12:30 – 17:30', icon: '☀️' },
+        { id: 'evening', name: 'Buổi Tối', period: 'Tiết 13 – 16', time: '18:00 – 21:00', icon: '🌙' },
+      ];
+
+      // Build Table HTML
+      let html = `<table class="matrix-table">`;
+      
+      // Header Row (Days of Week)
+      html += `<thead><tr>`;
+      html += `<th class="matrix-session-th" style="background: rgba(0,0,0,0.3); font-size: 12px; color: var(--text-muted);">Buổi / Thứ</th>`;
+      dayDates.forEach((d, idx) => {
+        const isToday = d.getTime() === now.getTime();
+        html += `
+          <th class="matrix-th ${isToday ? 'today-col' : ''}">
+            <div style="font-size: 13px; font-weight: 700; color: ${isToday ? '#38bdf8' : '#fff'};">
+              ${dayNames[idx]}
+            </div>
+            <div style="font-size: 11px; color: ${isToday ? '#7dd3fc' : 'var(--text-muted)'}; margin-top: 2px;">
+              ${d.getDate()}/${d.getMonth() + 1}
+              ${isToday ? '<span class="badge" style="background: #0ea5e9; color: #fff; font-size: 9px; padding: 1px 5px; margin-left: 4px;">HÔM NAY</span>' : ''}
+            </div>
+          </th>
+        `;
+      });
+      html += `</tr></thead><tbody>`;
+
+      // Session Rows (Sáng, Chiều, Tối)
+      sessions.forEach(sess => {
+        html += `<tr>`;
+        html += `
+          <td class="matrix-session-th">
+            <div style="font-size: 14px; margin-bottom: 2px;">${sess.icon}</div>
+            <div style="font-size: 12px; font-weight: 700; color: #fff;">${sess.name}</div>
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${sess.period}</div>
+            <div style="font-size: 9.5px; color: var(--text-subtle);">${sess.time}</div>
+          </td>
+        `;
+
+        // 7 Day Cells for this session
+        dayDates.forEach(d => {
+          const isToday = d.getTime() === now.getTime();
+          const dayDateStr = d.toDateString();
+
+          // Find classes in this day & session
+          const matchingClasses = (appState.classes || []).filter(c => {
+            const cStart = new Date(c.start);
+            if (cStart.toDateString() !== dayDateStr) return false;
+            const hour = cStart.getHours() + (cStart.getMinutes() / 60);
+            if (sess.id === 'morning') return hour < 12.0;
+            if (sess.id === 'afternoon') return hour >= 12.0 && hour < 17.5;
+            if (sess.id === 'evening') return hour >= 17.5;
+            return false;
+          });
+
+          html += `<td class="matrix-td ${isToday ? 'today-col' : ''}">`;
+          if (matchingClasses.length === 0) {
+            html += `<div style="height: 100%; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.12); font-size: 14px;">—</div>`;
+          } else {
+            matchingClasses.forEach(c => {
+              const startDt = new Date(c.start);
+              const endDt = new Date(c.end);
+              const timeStr = `${startDt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${endDt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+              const courseColor = c.color_hex || getCourseHexColor(c.title);
+              const room = c.location ? c.location.split(',')[0].trim() : 'Phòng học';
+              const isCancelled = !!c.is_cancelled;
+
+              html += `
+                <div class="matrix-card-chip ${isCancelled ? 'cancelled' : ''}" style="border-left-color: ${courseColor};" onclick="openClassDetailModal('${c.uid}')" title="Nhấp để xem chi tiết buổi học">
+                  <div class="matrix-chip-title" style="${isCancelled ? 'text-decoration: line-through; opacity: 0.6;' : ''}">
+                    ${escapeHtml(c.title)}
+                  </div>
+                  <div class="matrix-chip-meta">
+                    <span style="font-family: var(--font-mono); font-size: 10.5px;">⏰ ${timeStr}</span>
+                    <span class="room-badge" style="background: ${courseColor}22; color: #fff; border-color: ${courseColor}44;">
+                      ${escapeHtml(room)}
+                    </span>
+                  </div>
+                  ${isCancelled ? '<div style="font-size: 9.5px; color: #f87171; font-weight: 600;">🏖️ GV CHO NGHỈ</div>' : ''}
+                </div>
+              `;
+            });
+          }
+          html += `</td>`;
+        });
+
+        html += `</tr>`;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+
+    function renderScheduleDayView() {
+      const container = document.getElementById('scheduleDayView');
+      if (!container) return;
+
+      const mon = new Date(appState.currentWeekMonday);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
+      const sessions = [
+        { id: 'morning', name: 'Buổi Sáng', time: '07:00 – 11:30', icon: '🌅' },
+        { id: 'afternoon', name: 'Buổi Chiều', time: '12:30 – 17:30', icon: '☀️' },
+        { id: 'evening', name: 'Buổi Tối', time: '18:00 – 21:00', icon: '🌙' },
+      ];
+
+      // On mobile render the currently selected day tab; on desktop render all 7 days
+      const isMobile = window.innerWidth < 860;
+      const daysToRender = isMobile ? [appState.selectedDayIndex] : [0, 1, 2, 3, 4, 5, 6];
+
+      container.innerHTML = daysToRender.map(idx => {
+        const d = new Date(mon.getTime() + idx * 86400000);
+        const isToday = d.getTime() === now.getTime();
+        const dayDateStr = d.toDateString();
+
+        let sessionHtml = '';
+        sessions.forEach(sess => {
+          const matchingClasses = (appState.classes || []).filter(c => {
+            const cStart = new Date(c.start);
+            if (cStart.toDateString() !== dayDateStr) return false;
+            const hour = cStart.getHours() + (cStart.getMinutes() / 60);
+            if (sess.id === 'morning') return hour < 12.0;
+            if (sess.id === 'afternoon') return hour >= 12.0 && hour < 17.5;
+            if (sess.id === 'evening') return hour >= 17.5;
+            return false;
+          });
+
+          if (matchingClasses.length > 0) {
+            sessionHtml += `
+              <div class="day-session-section">
+                <div class="day-session-label">
+                  <span>${sess.icon}</span>
+                  <span>${sess.name}</span>
+                  <span style="font-weight: 400; text-transform: none; opacity: 0.7;">(${sess.time})</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  ${matchingClasses.map(c => {
+                    const startDt = new Date(c.start);
+                    const endDt = new Date(c.end);
+                    const timeStr = `${startDt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${endDt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+                    const courseColor = c.color_hex || getCourseHexColor(c.title);
+                    const isCancelled = !!c.is_cancelled;
+
+                    return `
+                      <div class="class-card" style="border-left: 4px solid ${courseColor}; cursor: pointer; padding: 14px 16px;" onclick="openClassDetailModal('${c.uid}')">
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                          <div>
+                            <span class="class-code" style="color: ${courseColor}; background: ${courseColor}22; border: 1px solid ${courseColor}44;">${escapeHtml(c.category || 'MÔN HỌC')}</span>
+                            <h4 style="font-size: 15px; font-weight: 700; color: #fff; margin-top: 4px; ${isCancelled ? 'text-decoration: line-through; opacity: 0.6;' : ''}">
+                              ${escapeHtml(c.title)}
+                            </h4>
+                          </div>
+                          <span class="room-badge">${escapeHtml(c.location ? c.location.split(',')[0] : 'Phòng')}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                          <span>⏰ ${timeStr}</span>
+                          <span>📍 ${escapeHtml(c.location)}</span>
+                        </div>
+                        ${isCancelled ? '<div style="margin-top: 6px; font-size: 11px; color: #f87171; font-weight: 600;">🏖️ Đã đánh dấu Giảng viên cho nghỉ</div>' : ''}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+          }
+        });
+
+        if (!sessionHtml) {
+          sessionHtml = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">Không có ca học nào trong ngày này.</div>`;
+        }
+
+        return `
+          <div class="day-view-card" style="${isToday ? 'border-color: rgba(14, 165, 233, 0.4); box-shadow: 0 0 20px rgba(14, 165, 233, 0.15);' : ''}">
+            <div class="day-view-header">
+              <div class="day-view-title">
+                <span>📅 ${dayNames[idx]}, ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}</span>
+                ${isToday ? '<span class="badge" style="background: #0ea5e9; color: #fff; font-size: 10px; padding: 2px 7px;">HÔM NAY</span>' : ''}
+              </div>
+            </div>
+            <div>
+              ${sessionHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Class Detail Modal Logic
+    let currentSelectedClassUid = null;
+
+    function openClassDetailModal(uid) {
+      const c = (appState.classes || []).find(x => x.uid === uid);
+      if (!c) return;
+
+      currentSelectedClassUid = uid;
+      const startDt = new Date(c.start);
+      const endDt = new Date(c.end);
+      const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      const dayName = dayNames[startDt.getDay()];
+      const dateStr = startDt.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const timeStr = `${startDt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${endDt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+      
+      const hour = startDt.getHours();
+      const sessName = hour < 12 ? 'Buổi Sáng' : (hour < 17.5 ? 'Buổi Chiều' : 'Buổi Tối');
+      const courseColor = c.color_hex || getCourseHexColor(c.title);
+      const isCancelled = !!c.is_cancelled;
+
+      document.getElementById('modalClassTitle').textContent = c.title;
+      document.getElementById('modalClassCode').textContent = c.category || 'MÔN HỌC';
+      document.getElementById('modalClassColorDot').style.background = courseColor;
+      document.getElementById('modalClassDayStr').textContent = `${dayName}, ${dateStr}`;
+      document.getElementById('modalClassTimeStr').textContent = `${sessName} • ${timeStr}`;
+      document.getElementById('modalClassRoom').textContent = c.location ? c.location.split(',')[0].trim() : 'Phòng học';
+      document.getElementById('modalClassLocation').textContent = c.location || 'HCMUTE';
+
+      const descBox = document.getElementById('modalClassDescBox');
+      if (c.description) {
+        descBox.textContent = c.description;
+        descBox.classList.remove('hidden');
+      } else {
+        descBox.classList.add('hidden');
+      }
+
+      const alertBox = document.getElementById('modalClassStatusAlert');
+      const cancelBtn = document.getElementById('modalClassCancelBtn');
+
+      if (isCancelled) {
+        alertBox.className = 'banner error';
+        alertBox.textContent = '🏖️ Buổi học này đang được đánh dấu Giảng viên cho nghỉ.';
+        alertBox.classList.remove('hidden');
+        cancelBtn.textContent = '↩️ Khôi phục (GV dạy lại)';
+        cancelBtn.style.color = 'var(--accent-amber)';
+        cancelBtn.onclick = () => { toggleCancelSession(uid, false); closeClassDetailModal(); };
+      } else {
+        alertBox.classList.add('hidden');
+        cancelBtn.textContent = '🏖️ Đánh dấu GV cho nghỉ';
+        cancelBtn.style.color = '#f87171';
+        cancelBtn.onclick = () => { toggleCancelSession(uid, true); closeClassDetailModal(); };
+      }
+
+      document.getElementById('classDetailModal')?.classList.add('open');
+    }
+
+    function closeClassDetailModal(e) {
+      if (e && e.target !== e.currentTarget && !e.target.classList.contains('btn-icon') && !e.target.classList.contains('btn-primary')) return;
+      document.getElementById('classDetailModal')?.classList.remove('open');
+    }
+
     function renderScheduleGrid(classes) {
       const grid = document.getElementById('scheduleGrid');
+      if (!grid) return;
       if (!classes || classes.length === 0) {
-        grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🏖️</div>Không có lịch học nào sắp tới trong thời gian này.</div>`;
+        grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🏖️</div>Không có lịch học nào trong danh sách.</div>`;
         return;
       }
 
@@ -1725,7 +2840,7 @@
         let cardStyle = '';
 
         if (isCancelled) {
-          badge = `<span class="priority-pill" style="margin-left: auto; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">❌ ĐÃ BÁO NGHỈ</span>`;
+          badge = `<span class="priority-pill" style="margin-left: auto; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">🏖️ GV CHO NGHỈ</span>`;
           cardStyle = 'opacity: 0.6; border-left: 4px solid #ef4444;';
         } else if (isUpcoming) {
           if (diffDays === 0) {
@@ -1744,28 +2859,28 @@
         }
 
         const cancelActionBtn = isCancelled
-          ? `<button class="btn-secondary" style="padding: 4px 10px; font-size: 11px; margin-top: 10px; color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.3);" onclick="toggleCancelSession('${c.uid}', false)">↩️ Khôi phục lại buổi học</button>`
-          : `<button class="btn-secondary" style="padding: 4px 10px; font-size: 11px; margin-top: 10px; color: #f87171; border-color: rgba(239, 68, 68, 0.2);" onclick="toggleCancelSession('${c.uid}', true)" title="Bấm nếu giảng viên báo nghỉ buổi này">❌ Báo nghỉ buổi này</button>`;
+          ? `<button class="btn-secondary" style="padding: 4px 10px; font-size: 11px; margin-top: 10px; color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.3);" onclick="event.stopPropagation(); toggleCancelSession('${c.uid}', false)">↩️ Khôi phục (GV dạy lại)</button>`
+          : `<button class="btn-secondary" style="padding: 4px 10px; font-size: 11px; margin-top: 10px; color: #f87171; border-color: rgba(239, 68, 68, 0.2);" onclick="event.stopPropagation(); toggleCancelSession('${c.uid}', true)" title="Đánh dấu nếu Giảng viên / Khoa thông báo cho nghỉ buổi học này">🏖️ Đánh dấu GV cho nghỉ</button>`;
 
         return `
-          <div class="class-card" style="${cardStyle}">
+          <div class="class-card" style="${cardStyle} cursor: pointer;" onclick="openClassDetailModal('${c.uid}')">
             <div>
               <div style="display: flex; align-items: center; margin-bottom: 8px;">
                 <span class="class-code" style="color: ${courseColor}; background: ${courseColor}22; border: 1px solid ${courseColor}44; font-weight: 600;">${c.category || 'MÔN HỌC'}</span>
                 ${badge}
               </div>
-              <h3 class="class-title" style="${isCancelled ? 'text-decoration: line-through; opacity: 0.7;' : ''}">${c.title}</h3>
+              <h3 class="class-title" style="${isCancelled ? 'text-decoration: line-through; opacity: 0.7;' : ''}">${escapeHtml(c.title)}</h3>
             </div>
             <div class="class-meta">
               <div class="meta-row">
                 <span>⏰ ${dayStr}</span>
-                <span class="room-badge">${c.location.split(',')[0] || 'Phòng'}</span>
+                <span class="room-badge">${escapeHtml(c.location.split(',')[0] || 'Phòng')}</span>
               </div>
               <div class="meta-row">
                 <span>🕒 Giờ học: ${timeStr}</span>
               </div>
               <div class="meta-row" style="color: var(--text-subtle); font-size: 11px;">
-                <span>📍 ${c.location}</span>
+                <span>📍 ${escapeHtml(c.location)}</span>
               </div>
               <div>
                 ${cancelActionBtn}
@@ -1837,7 +2952,7 @@
       list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Đang phân tích thông báo, kiểm tra hạn nộp học phí, SHCD...</div>`;
 
       try {
-        const res = await fetch('/api/considerations' + (force ? '?force=1' : ''));
+        const res = await apiFetch('/api/considerations' + (force ? '?force=1' : ''));
         let data;
         try {
           data = await res.json();
@@ -1925,7 +3040,7 @@
       modal.classList.add('open');
 
       try {
-        const res = await fetch(`/api/notice-detail?id=${encodeURIComponent(id)}&type=${encodeURIComponent(type)}`);
+        const res = await apiFetch(`/api/notice-detail?id=${encodeURIComponent(id)}&type=${encodeURIComponent(type)}`);
         let data;
         try {
           data = await res.json();
@@ -1984,7 +3099,7 @@
       };
 
       try {
-        const res = await fetch('/api/export-ics', {
+        const res = await apiFetch('/api/export-ics', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -2033,7 +3148,7 @@
       };
 
       try {
-        const res = await fetch('/api/export-ics', {
+        const res = await apiFetch('/api/export-ics', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -2057,10 +3172,11 @@
       }
     }
 
-    function getLiveFeedUrls() {
-      const slug = 'feed.ics';
+    function getLiveFeedUrls(customSlug = 'feed.ics') {
       const host = window.location.host;
       const protocol = window.location.protocol;
+      const mssv = appState.profile ? String(appState.profile.id).trim() : '';
+      const slug = mssv ? `${mssv}/${customSlug}` : customSlug;
       
       const httpFeedUrl = `${protocol}//${host}/calendar/${slug}`;
       const webcalUrl = `webcal://${host}/calendar/${slug}`;
@@ -2071,12 +3187,7 @@
 
     function syncOneClickLive(target, customSlug = 'feed.ics') {
       const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const host = window.location.host;
-      const protocol = window.location.protocol;
-      
-      const slug = customSlug || 'feed.ics';
-      const webcalUrl = `webcal://${host}/calendar/${slug}`;
-      const googleSubscribeUrl = `https://calendar.google.com/calendar/render?cid=webcal://${host}/calendar/${slug}`;
+      const { webcalUrl, googleSubscribeUrl } = getLiveFeedUrls(customSlug);
 
       if (target === 'google') {
         if (isLocal) {
@@ -2111,7 +3222,7 @@
     async function toggleCancelSession(uid, shouldCancel) {
       const endpoint = shouldCancel ? '/api/schedule/cancel' : '/api/schedule/uncancel';
       try {
-        const res = await fetch(endpoint, {
+        const res = await apiFetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ uid: uid })
@@ -2128,12 +3239,12 @@
           if (shouldCancel && data.vote_result) {
             const vr = data.vote_result;
             if (vr.status === 'confirmed') {
-              showBanner(`🎉 Đã đạt tỉ lệ xác nhận nghỉ học (${vr.votes}/${vr.total} bạn - ${Math.round(vr.percent)}%)! Buổi học đã được xóa khỏi lịch cho cả lớp.`, 'success');
+              showBanner(`🎉 Đã đủ tỉ lệ xác nhận Giảng viên cho nghỉ (${vr.votes}/${vr.total} bạn - ${Math.round(vr.percent)}%)! Buổi học đã được xóa khỏi lịch cho cả lớp.`, 'success');
             } else {
-              showBanner(`🗳️ Đã ghi nhận báo nghỉ (${vr.votes}/${vr.needed} bạn - ${Math.round(vr.percent)}%). Khi đủ ${vr.threshold}%, bot sẽ tự động thông báo và xóa lịch!`, 'success');
+              showBanner(`🗳️ Đã ghi nhận xác nhận Giảng viên cho nghỉ (${vr.votes}/${vr.needed} bạn - ${Math.round(vr.percent)}%). Khi đủ ${vr.threshold}%, bot sẽ tự động thông báo và xóa lịch!`, 'success');
             }
           } else {
-            showBanner(shouldCancel ? '✔ Đã đánh dấu báo nghỉ buổi học!' : '✔ Đã khôi phục buổi học vào lịch!', 'success');
+            showBanner(shouldCancel ? '✔ Đã đánh dấu Giảng viên cho nghỉ buổi học này!' : '✔ Đã khôi phục buổi học vào lịch!', 'success');
           }
           await loadOverviewData();
         }
@@ -2152,7 +3263,7 @@
       const location = prompt("Nhập Phòng học (ví dụ C501, A1-203):", "HCMUTE") || "HCMUTE";
 
       try {
-        const res = await fetch('/api/schedule/makeup', {
+        const res = await apiFetch('/api/schedule/makeup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, date: dateStr, start_time: timeStr, location })
@@ -2253,6 +3364,161 @@
 
     function copyWebcalUrl() {
       copyLiveFeedUrl();
+    }
+
+    // ==========================================
+    // FEEDBACK & AI EVALUATION SYSTEM
+    // ==========================================
+    let currentFeedbackCategory = 'feature';
+
+    function selectFbCategory(cat, el) {
+      currentFeedbackCategory = cat;
+      document.querySelectorAll('#feedbackCategoryGroup .fb-cat-btn').forEach(b => b.classList.remove('active'));
+      if (el) el.classList.add('active');
+    }
+
+    async function handleFeedbackSubmit(e) {
+      e.preventDefault();
+      const title = document.getElementById('fbInputTitle').value.trim();
+      const content = document.getElementById('fbInputContent').value.trim();
+      const isAnon = document.getElementById('fbInputAnonymous').checked;
+      const btn = document.getElementById('fbSubmitBtn');
+      const banner = document.getElementById('fbAiResultBanner');
+
+      if (!title || !content) return;
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> <span>AI đang phân tích & xếp hạng...</span>`;
+      banner.classList.add('hidden');
+
+      try {
+        const res = await apiFetch('/api/feedback/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category: currentFeedbackCategory,
+            title: title,
+            content: content,
+            is_anonymous: isAnon,
+          })
+        });
+
+        const data = await res.json();
+        if (data.success && data.feedback) {
+          const fb = data.feedback;
+          const ai = fb.ai_evaluation || {};
+          
+          // Display AI evaluation result banner
+          banner.classList.remove('hidden');
+          const badge = document.getElementById('fbAiResultLevelBadge');
+          const lvl = ai.level || 5;
+          badge.textContent = ai.level_label || `Cấp ${lvl}`;
+          const badgeStyle = getLevelBadgeColor(lvl);
+          badge.style.background = badgeStyle.bg;
+          badge.style.color = badgeStyle.color;
+          badge.style.border = `1px solid ${badgeStyle.border}`;
+
+          document.getElementById('fbAiResultSummary').textContent = ai.ai_summary || 'Ý kiến đã được ghi nhận.';
+          document.getElementById('fbAiResultReco').textContent = `Khả thi: ${ai.feasibility || 'Đang xem xét'} • ${ai.ai_recommendation || ''}`;
+
+          // Reset inputs
+          document.getElementById('fbInputTitle').value = '';
+          document.getElementById('fbInputContent').value = '';
+          showBanner('🎉 Gửi góp ý thành công! AI đã tiếp nhận và xếp hạng độ ưu tiên.', 'success');
+          await loadMyFeedbacks();
+        } else {
+          showBanner('Lỗi: ' + (data.message || 'Không thể gửi góp ý'), 'error');
+        }
+      } catch (err) {
+        showBanner('Không thể kết nối đến máy chủ. Bạn thử lại sau nhé.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Gửi góp ý cho AI thẩm định</span> <span>➔</span>`;
+      }
+    }
+
+    function getLevelBadgeColor(lvl) {
+      const colors = {
+        1: { bg: 'rgba(239, 68, 68, 0.25)', color: '#f87171', border: 'rgba(239, 68, 68, 0.4)' },
+        2: { bg: 'rgba(249, 115, 22, 0.22)', color: '#fb923c', border: 'rgba(249, 115, 22, 0.4)' },
+        3: { bg: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: 'rgba(245, 158, 11, 0.35)' },
+        4: { bg: 'rgba(234, 179, 8, 0.18)', color: '#facc15', border: 'rgba(234, 179, 8, 0.35)' },
+        5: { bg: 'rgba(16, 185, 129, 0.18)', color: '#34d399', border: 'rgba(16, 185, 129, 0.35)' },
+        6: { bg: 'rgba(14, 165, 233, 0.18)', color: '#38bdf8', border: 'rgba(14, 165, 233, 0.35)' },
+        7: { bg: 'rgba(168, 85, 247, 0.18)', color: '#c084fc', border: 'rgba(168, 85, 247, 0.35)' },
+        8: { bg: 'rgba(148, 163, 184, 0.18)', color: '#94a3b8', border: 'rgba(148, 163, 184, 0.35)' },
+        9: { bg: 'rgba(120, 113, 108, 0.18)', color: '#a8a29e', border: 'rgba(120, 113, 108, 0.35)' },
+        10: { bg: 'rgba(82, 82, 91, 0.25)', color: '#71717a', border: 'rgba(82, 82, 91, 0.4)' },
+      };
+      return colors[lvl] || colors[5];
+    }
+
+    async function loadMyFeedbacks() {
+      const container = document.getElementById('myFeedbacksContainer');
+      if (!container) return;
+
+      try {
+        const res = await apiFetch('/api/feedback/my');
+        const data = await res.json();
+        if (!data.success || !data.feedbacks || data.feedbacks.length === 0) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 13px;">
+              Chưa có ý kiến nào được gửi. Hãy chia sẻ đóng góp của bạn để hoàn thiện UTECal nhé!
+            </div>
+          `;
+          return;
+        }
+
+        const catIcons = { feature: '🚀 Tính năng', bug: '🐛 Báo lỗi', ui: '🎨 Giao diện', other: '💬 Ý kiến' };
+        const statusMap = {
+          pending: '<span class="badge" style="background: rgba(234, 179, 8, 0.15); color: #facc15;">⏳ Chờ xem xét</span>',
+          reviewed: '<span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8;">👀 Đã ghi nhận</span>',
+          resolved: '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">✅ Đã xử lý</span>',
+          dismissed: '<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8;">Đã lưu trữ</span>',
+        };
+
+        container.innerHTML = data.feedbacks.map(fb => {
+          const ai = fb.ai_evaluation || {};
+          const lvl = ai.level || 5;
+          const badgeStyle = getLevelBadgeColor(lvl);
+          const dt = new Date(fb.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+
+          return `
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
+                <div style="font-weight: 600; font-size: 14px; color: #fff; line-height: 1.4;">${escapeHtml(fb.title)}</div>
+                <span class="badge" style="background: ${badgeStyle.bg}; color: ${badgeStyle.color}; border: 1px solid ${badgeStyle.border}; font-size: 10px; white-space: nowrap;">
+                  Cấp ${lvl}
+                </span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">${escapeHtml(fb.content)}</div>
+              
+              <div style="font-size: 11px; padding: 8px 10px; background: rgba(0, 0, 0, 0.25); border-radius: 8px; border-left: 3px solid ${badgeStyle.color};">
+                <div style="color: ${badgeStyle.color}; font-weight: 600; margin-bottom: 2px;">🤖 ${escapeHtml(ai.level_label || `Cấp ${lvl}`)}</div>
+                <div style="color: var(--text-muted);">${escapeHtml(ai.ai_summary || '')}</div>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-subtle); margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span>${catIcons[fb.category] || '💬'}</span>
+                  <span>•</span>
+                  <span>${dt}</span>
+                  ${fb.is_anonymous ? '<span>• 🕶️ Ẩn danh</span>' : ''}
+                </div>
+                <div>${statusMap[fb.status] || statusMap.pending}</div>
+              </div>
+
+              ${fb.admin_note ? `
+                <div style="font-size: 11px; padding: 6px 10px; background: rgba(14, 165, 233, 0.08); border-left: 2px solid var(--accent-blue); border-radius: 4px; color: #7dd3fc;">
+                  <strong>Admin phản hồi:</strong> ${escapeHtml(fb.admin_note)}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">Chưa thể tải lịch sử góp ý.</div>`;
+      }
     }
 
     function showBanner(msg, type = 'success') {

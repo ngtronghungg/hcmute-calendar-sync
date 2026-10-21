@@ -537,14 +537,19 @@
           <div class="stat-desc" id="statBotUsername">@hcmute_calendar_bot</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Ngưỡng báo nghỉ</div>
+          <div class="stat-label">Ngưỡng GV cho nghỉ</div>
           <div class="stat-value" id="statCrowdThreshold">80%</div>
-          <div class="stat-desc">Tự động hủy lịch khi đủ vote lớp</div>
+          <div class="stat-desc">Tự động xóa lịch khi đủ vote lớp</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Lớp học bù</div>
           <div class="stat-value" id="statMakeupCount">0</div>
           <div class="stat-desc">Buổi bù đồng bộ Google Calendar</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Góp ý & Đề xuất AI</div>
+          <div class="stat-value" id="statFeedbackCount">0</div>
+          <div class="stat-desc">Phân loại qua 10 cấp độ ưu tiên</div>
         </div>
       </div>
 
@@ -556,7 +561,7 @@
               <h3 class="card-title" style="margin-bottom: 0;">
                 <span>👥 Nhật ký MSSV đã truy cập</span>
               </h3>
-              <span class="badge badge-success" style="font-size: 10px; padding: 2px 8px;">● Trực tiếp (6s)</span>
+              <span class="badge badge-success" style="font-size: 10px; padding: 2px 8px;">● Tự động (30s)</span>
             </div>
             <p class="card-subtitle">
               Danh sách sinh viên đã truy cập qua Web Portal hoặc Telegram Bot
@@ -595,31 +600,79 @@
         </div>
       </div>
 
-      <!-- SECTION 2: BROADCAST ANNOUNCEMENT -->
-      <div class="card">
+      <!-- SECTION: AI-RANKED FEEDBACK & SUGGESTIONS (10 LEVELS) -->
+      <div class="card" id="adminFeedbackSection">
         <div class="card-header">
           <div>
-            <h3 class="card-title">
-              <span>📢 Phát thông báo khẩn (Broadcast)</span>
-            </h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h3 class="card-title" style="margin-bottom: 0;">
+                <span>💡 Hòm thư Góp ý & Bảng xếp hạng AI</span>
+              </h3>
+              <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-blue); border: 1px solid rgba(14, 165, 233, 0.3); font-size: 10px; padding: 2px 8px;">
+                10 Cấp độ (Cần thiết ➔ Spam)
+              </span>
+            </div>
             <p class="card-subtitle">
-              Tin nhắn gửi tức thì đến Telegram của toàn bộ sinh viên trong hệ thống
+              Ý kiến sinh viên được AI tự động phân tích cảm xúc, mức độ khả thi và xếp hạng ưu tiên
             </p>
           </div>
-        </div>
-        <div>
-          <div class="form-group">
-            <textarea id="broadcastMsgInput" class="form-input" rows="3" placeholder="Nhập nội dung thông báo chung (VD: Thông báo nghỉ lễ, dời lịch thi, thông báo học vụ)..." style="resize: vertical;"></textarea>
-          </div>
-          <div style="display: flex; justify-content: flex-end;">
-            <button class="btn btn-primary" onclick="sendBroadcast()">
-              <span>Phát thông báo ngay</span>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm" style="border-color: rgba(239, 68, 68, 0.35); color: #f87171;" onclick="purgeSpamFeedbacks()">
+              <span>🗑️ Dọn sạch Spam (Cấp 10)</span>
             </button>
+            <button class="btn btn-secondary btn-sm" onclick="loadAdminFeedbacks()">
+              <span>🔄 Làm mới</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 10-Level Mini Quick Filters Bar -->
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; padding-bottom: 14px; border-bottom: 1px solid var(--surface-border);">
+          <span style="font-size: 12px; color: var(--text-subtle); margin-right: 4px;">Lọc cấp độ:</span>
+          <button class="btn btn-secondary btn-sm active" id="fbFilterBtn_all" onclick="filterAdminFeedbacks(null, this)" style="border-radius: var(--radius-full); font-size: 11px;">
+            Tất cả (<span id="fbCount_all">0</span>)
+          </button>
+          <button class="btn btn-secondary btn-sm" id="fbFilterBtn_urgent" onclick="filterAdminFeedbacks('urgent', this)" style="border-radius: var(--radius-full); font-size: 11px; border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
+            🔴 Khẩn cấp (Cấp 1-2): <span id="fbCount_urgent">0</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" id="fbFilterBtn_feature" onclick="filterAdminFeedbacks('feature', this)" style="border-radius: var(--radius-full); font-size: 11px; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+            🟠 Giá trị cao (Cấp 3-5): <span id="fbCount_feature">0</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" id="fbFilterBtn_low" onclick="filterAdminFeedbacks('low', this)" style="border-radius: var(--radius-full); font-size: 11px; border-color: rgba(148, 163, 184, 0.4); color: #94a3b8;">
+            ⚪ Thấp/Cần làm rõ (Cấp 6-8): <span id="fbCount_low">0</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" id="fbFilterBtn_spam" onclick="filterAdminFeedbacks('spam', this)" style="border-radius: var(--radius-full); font-size: 11px; border-color: rgba(82, 82, 91, 0.4); color: #71717a;">
+            ⚫ Spam (Cấp 9-10): <span id="fbCount_spam">0</span>
+          </button>
+
+          <!-- Specific level dropdown -->
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 11px; color: var(--text-muted);">Cụ thể:</label>
+            <select id="fbSpecificLevelSelect" onchange="filterAdminFeedbacksSpecific(this.value)" class="form-input" style="padding: 4px 8px; font-size: 12px; width: auto; border-radius: 8px;">
+              <option value="">Tất cả 10 cấp độ</option>
+              <option value="1">Cấp 1: Cực kỳ khẩn cấp</option>
+              <option value="2">Cấp 2: Rất cần thiết</option>
+              <option value="3">Cấp 3: Tính năng giá trị cao</option>
+              <option value="4">Cấp 4: Cải tiến UX quan trọng</option>
+              <option value="5">Cấp 5: Góp ý xây dựng</option>
+              <option value="6">Cấp 6: Tinh chỉnh nhỏ</option>
+              <option value="7">Cấp 7: Thắc mắc / Đã có</option>
+              <option value="8">Cấp 8: Chưa rõ ràng</option>
+              <option value="9">Cấp 9: Không khả thi</option>
+              <option value="10">Cấp 10: Rác / Spam</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Feedbacks List Container -->
+        <div id="adminFeedbacksList" style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px;">
+            Đang tải danh sách góp ý sinh viên...
           </div>
         </div>
       </div>
 
-      <!-- SECTION 3: BOT TELEGRAM & WEBHOOK CONFIGURATION -->
+      <!-- SECTION 2: BOT TELEGRAM & WEBHOOK CONFIGURATION -->
       <div class="card">
         <div class="card-header">
           <div>
@@ -671,10 +724,10 @@
           <div class="card-header">
             <div>
               <h3 class="card-title">
-                <span>🗳️ Tự động báo nghỉ (Crowdsource)</span>
+                <span>🏖️ Xác nhận GV cho nghỉ (Crowdsource)</span>
               </h3>
               <p class="card-subtitle">
-                Tự động xóa lịch và cảnh báo lớp khi đạt đủ tỷ lệ sinh viên báo nghỉ
+                Tự động xóa lịch và cảnh báo lớp khi đạt đủ tỷ lệ sinh viên xác nhận Giảng viên cho nghỉ
               </p>
             </div>
           </div>
@@ -769,7 +822,11 @@
       document.getElementById('adminPortal').classList.remove('hidden');
       loadAllDashboardData();
       if (!livePollInterval) {
-        livePollInterval = setInterval(loadAdminUsers, 6000); // Tự cập nhật danh sách mỗi 6s
+        livePollInterval = setInterval(() => {
+          if (!document.hidden) {
+            loadAdminUsers();
+          }
+        }, 30000); // Tự cập nhật danh sách mỗi 30s khi tab đang mở, tạm dừng khi ẩn tab
       }
     }
 
@@ -789,6 +846,7 @@
     async function loadAllDashboardData() {
       await Promise.all([
         loadAdminUsers(),
+        loadAdminFeedbacks(),
         loadBotConfig(),
         loadCrowdsourceSettings(),
         loadMakeupClasses()
@@ -914,38 +972,7 @@
       }
     }
 
-    // 4. Send Broadcast
-    async function sendBroadcast() {
-      const input = document.getElementById('broadcastMsgInput');
-      const msg = input ? input.value.trim() : '';
-      if (!msg) {
-        showBanner('Vui lòng nhập nội dung thông báo', 'error');
-        return;
-      }
-
-      if (!confirm('Gửi thông báo này tới toàn bộ sinh viên đã kết nối bot?')) return;
-
-      showBanner('Đang phát sóng thông báo...', 'success');
-      try {
-        const res = await fetch('/api/telegram/broadcast', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminPasscode },
-          body: JSON.stringify({ message: msg })
-        });
-        const data = await res.json();
-        if (data.success) {
-          const r = data.result || {};
-          showBanner(`Đã phát thông báo thành công đến ${r.sent}/${r.total} sinh viên`, 'success');
-          if (input) input.value = '';
-        } else {
-          showBanner('Lỗi: ' + data.message, 'error');
-        }
-      } catch (err) {
-        showBanner('Lỗi: ' + err.message, 'error');
-      }
-    }
-
-    // 5. Bot Config
+    // 4. Bot Config
     async function loadBotConfig() {
       try {
         const res = await fetch('/api/telegram/config');
@@ -1031,12 +1058,12 @@
           const items = Object.entries(votesData.votes).map(([uid, voters]) => `
             <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); display: flex; justify-content: space-between;">
               <span>📌 ${uid.substring(0, 30)}...</span>
-              <span class="badge badge-warning">${voters.length} lượt báo nghỉ</span>
+              <span class="badge badge-warning">${voters.length} lượt xác nhận GV cho nghỉ</span>
             </div>
           `).join('');
           container.innerHTML = `<div><strong>Các ca học đang bình chọn:</strong>${items}</div>`;
         } else {
-          container.innerHTML = `<span style="color: var(--text-subtle);">Chưa có ca học nào được báo nghỉ.</span>`;
+          container.innerHTML = `<span style="color: var(--text-subtle);">Chưa có ca học nào được đánh dấu GV cho nghỉ.</span>`;
         }
       } catch (err) {}
     }
@@ -1051,7 +1078,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          showBanner(`Đã cập nhật ngưỡng báo nghỉ: ${val}%`, 'success');
+          showBanner(`Đã cập nhật ngưỡng GV cho nghỉ: ${val}%`, 'success');
           document.getElementById('statCrowdThreshold').textContent = val + '%';
         } else {
           showBanner('Lỗi: ' + data.message, 'error');
@@ -1130,6 +1157,347 @@
         if (data.success) {
           showBanner('Đã xóa ca học bù', 'success');
           await loadMakeupClasses();
+        }
+      } catch (err) {
+        showBanner('Lỗi: ' + err.message, 'error');
+      }
+    }
+
+    // ==========================================
+    // 💡 AI-RANKED FEEDBACK & SUGGESTIONS (10 LEVELS)
+    // ==========================================
+    let adminFeedbacksCache = [];
+    let currentAdminFbFilter = null; // null | 'urgent' | 'feature' | 'low' | 'spam' | number 1..10
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    const LEVEL_COLORS = {
+      1: { bg: 'rgba(239, 68, 68, 0.25)', color: '#f87171', border: 'rgba(239, 68, 68, 0.4)', tag: 'Cấp 1: Khẩn cấp' },
+      2: { bg: 'rgba(249, 115, 22, 0.22)', color: '#fb923c', border: 'rgba(249, 115, 22, 0.4)', tag: 'Cấp 2: Rất cần thiết' },
+      3: { bg: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: 'rgba(245, 158, 11, 0.35)', tag: 'Cấp 3: Tính năng giá trị' },
+      4: { bg: 'rgba(234, 179, 8, 0.18)', color: '#facc15', border: 'rgba(234, 179, 8, 0.35)', tag: 'Cấp 4: Cải tiến UX' },
+      5: { bg: 'rgba(16, 185, 129, 0.18)', color: '#34d399', border: 'rgba(16, 185, 129, 0.35)', tag: 'Cấp 5: Góp ý xây dựng' },
+      6: { bg: 'rgba(14, 165, 233, 0.18)', color: '#38bdf8', border: 'rgba(14, 165, 233, 0.35)', tag: 'Cấp 6: Tinh chỉnh nhỏ' },
+      7: { bg: 'rgba(168, 85, 247, 0.18)', color: '#c084fc', border: 'rgba(168, 85, 247, 0.35)', tag: 'Cấp 7: Thắc mắc' },
+      8: { bg: 'rgba(148, 163, 184, 0.18)', color: '#94a3b8', border: 'rgba(148, 163, 184, 0.35)', tag: 'Cấp 8: Chưa rõ ràng' },
+      9: { bg: 'rgba(120, 113, 108, 0.18)', color: '#a8a29e', border: 'rgba(120, 113, 108, 0.35)', tag: 'Cấp 9: Ngoài phạm vi' },
+      10: { bg: 'rgba(82, 82, 91, 0.25)', color: '#71717a', border: 'rgba(82, 82, 91, 0.4)', tag: 'Cấp 10: Spam' },
+    };
+
+    async function loadAdminFeedbacks() {
+      const container = document.getElementById('adminFeedbacksList');
+      if (!container) return;
+
+      try {
+        const res = await fetch('/api/admin/feedbacks', {
+          headers: { 'X-Admin-Key': adminPasscode }
+        });
+        const json = await res.json();
+        if (!json.success) {
+          if (res.status === 403) logoutAdmin();
+          return;
+        }
+
+        const data = json.data || {};
+        adminFeedbacksCache = data.feedbacks || [];
+        const stats = data.stats || {};
+
+        // Update stats
+        const statCount = document.getElementById('statFeedbackCount');
+        if (statCount) statCount.textContent = stats.total || 0;
+
+        const countAll = document.getElementById('fbCount_all');
+        if (countAll) countAll.textContent = stats.total || 0;
+        const countUrgent = document.getElementById('fbCount_urgent');
+        if (countUrgent) countUrgent.textContent = stats.urgent_count || 0;
+        const countFeature = document.getElementById('fbCount_feature');
+        if (countFeature) countFeature.textContent = stats.feature_count || 0;
+        const countLow = document.getElementById('fbCount_low');
+        if (countLow) countLow.textContent = stats.low_count || 0;
+        const countSpam = document.getElementById('fbCount_spam');
+        if (countSpam) countSpam.textContent = stats.spam_count || 0;
+
+        renderAdminFeedbacks();
+      } catch (err) {
+        container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">Lỗi khi tải dữ liệu góp ý: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function filterAdminFeedbacks(type, btn) {
+      currentAdminFbFilter = type;
+      document.querySelectorAll('#adminFeedbackSection button[id^="fbFilterBtn_"]').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      const select = document.getElementById('fbSpecificLevelSelect');
+      if (select) select.value = '';
+      renderAdminFeedbacks();
+    }
+
+    function filterAdminFeedbacksSpecific(val) {
+      document.querySelectorAll('#adminFeedbackSection button[id^="fbFilterBtn_"]').forEach(b => b.classList.remove('active'));
+      if (val) {
+        currentAdminFbFilter = parseInt(val);
+      } else {
+        currentAdminFbFilter = null;
+        const allBtn = document.getElementById('fbFilterBtn_all');
+        if (allBtn) allBtn.classList.add('active');
+      }
+      renderAdminFeedbacks();
+    }
+
+    function renderAdminFeedbacks() {
+      const container = document.getElementById('adminFeedbacksList');
+      if (!container) return;
+
+      let list = adminFeedbacksCache;
+      if (currentAdminFbFilter === 'urgent') {
+        list = list.filter(f => {
+          const l = f.ai_evaluation?.level || 5;
+          return l === 1 || l === 2;
+        });
+      } else if (currentAdminFbFilter === 'feature') {
+        list = list.filter(f => {
+          const l = f.ai_evaluation?.level || 5;
+          return l >= 3 && l <= 5;
+        });
+      } else if (currentAdminFbFilter === 'low') {
+        list = list.filter(f => {
+          const l = f.ai_evaluation?.level || 5;
+          return l >= 6 && l <= 8;
+        });
+      } else if (currentAdminFbFilter === 'spam') {
+        list = list.filter(f => {
+          const l = f.ai_evaluation?.level || 5;
+          return l === 9 || l === 10;
+        });
+      } else if (typeof currentAdminFbFilter === 'number') {
+        list = list.filter(f => (f.ai_evaluation?.level || 5) === currentAdminFbFilter);
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 36px 16px; color: var(--text-muted); font-size: 13px; background: rgba(255,255,255,0.02); border: 1px dashed var(--surface-border); border-radius: var(--radius-md);">
+            Không có góp ý nào phù hợp với bộ lọc hiện tại.
+          </div>
+        `;
+        return;
+      }
+
+      const catIcons = { feature: '🚀 Tính năng mới', bug: '🐛 Báo lỗi', ui: '🎨 Giao diện', other: '💬 Ý kiến khác' };
+      const statusLabels = {
+        pending: '<span class="badge badge-warning">⏳ Chờ xem xét</span>',
+        reviewed: '<span class="badge" style="background: rgba(14, 165, 233, 0.2); color: #38bdf8;">👀 Đã ghi nhận</span>',
+        resolved: '<span class="badge badge-success">✅ Đã xử lý</span>',
+        dismissed: '<span class="badge" style="background: rgba(148, 163, 184, 0.2); color: #94a3b8;">Đã lưu trữ</span>',
+      };
+
+      container.innerHTML = list.map(fb => {
+        const ai = fb.ai_evaluation || {};
+        const lvl = ai.level || 5;
+        const colorCfg = LEVEL_COLORS[lvl] || LEVEL_COLORS[5];
+        const dt = new Date(fb.created_at).toLocaleString('vi-VN', {
+          hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+
+        const authorDisplay = fb.is_anonymous
+          ? `🕶️ Ẩn danh <span style="font-size: 11px; opacity: 0.7;">(MSSV: ${escapeHtml(fb.mssv)})</span>`
+          : `👤 <strong>${escapeHtml(fb.author_name)}</strong> <span style="font-size: 11px; color: var(--text-muted);">(${escapeHtml(fb.mssv)})</span>`;
+
+        return `
+          <div style="background: rgba(255, 255, 255, 0.025); border: 1px solid var(--surface-border); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; gap: 12px; transition: border-color 0.2s;">
+            
+            <!-- Header Row -->
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span class="badge" style="background: ${colorCfg.bg}; color: ${colorCfg.color}; border: 1px solid ${colorCfg.border}; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full);">
+                  ${escapeHtml(colorCfg.tag)}
+                </span>
+                <span style="font-size: 13px; color: var(--text);">${authorDisplay}</span>
+                <span style="font-size: 11px; color: var(--text-subtle);">• ${dt}</span>
+                <span class="badge" style="font-size: 10px; background: rgba(255,255,255,0.06); color: var(--text-muted);">
+                  ${catIcons[fb.category] || '💬 Ý kiến'}
+                </span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                ${statusLabels[fb.status] || statusLabels.pending}
+              </div>
+            </div>
+
+            <!-- Title & Content -->
+            <div>
+              <div style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; line-height: 1.4;">
+                ${escapeHtml(fb.title)}
+              </div>
+              <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6; white-space: pre-line;">
+                ${escapeHtml(fb.content)}
+              </div>
+            </div>
+
+            <!-- AI EVALUATION BOX -->
+            <div style="background: rgba(0, 0, 0, 0.35); border-left: 3px solid ${colorCfg.color}; border-radius: var(--radius-sm); padding: 12px 14px; font-size: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                <div style="font-weight: 600; color: ${colorCfg.color}; display: flex; align-items: center; gap: 6px;">
+                  <span>🤖 AI Thẩm định:</span>
+                  <span>${escapeHtml(ai.level_label || `Cấp ${lvl}`)}</span>
+                </div>
+                <div style="font-size: 10px; color: var(--text-subtle);">${escapeHtml(ai.evaluator || 'AI Engine')}</div>
+              </div>
+              
+              <div style="color: var(--text); line-height: 1.5;">
+                ${escapeHtml(ai.ai_summary || '')}
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; margin-top: 2px;">
+                <span>Cảm xúc: <strong>${escapeHtml(ai.sentiment || 'Trung lập')}</strong></span>
+                <span>•</span>
+                <span>Khả thi: <strong>${escapeHtml(ai.feasibility || 'Đang xem xét')}</strong></span>
+              </div>
+
+              ${ai.ai_recommendation ? `
+                <div style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.08); color: #7dd3fc; font-size: 11px;">
+                  💡 <strong>Gợi ý hành động:</strong> ${escapeHtml(ai.ai_recommendation)}
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Admin Note Display -->
+            ${fb.admin_note ? `
+              <div style="font-size: 12px; padding: 8px 12px; background: rgba(14, 165, 233, 0.1); border-left: 3px solid var(--accent-blue); border-radius: 6px; color: #bae6fd;">
+                <strong>Ghi chú Admin:</strong> ${escapeHtml(fb.admin_note)}
+              </div>
+            ` : ''}
+
+            <!-- Admin Action Toolbar -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 4px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                ${fb.status !== 'resolved' ? `
+                  <button class="btn btn-secondary btn-sm" style="border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald);" onclick="updateFeedbackStatus('${fb.id}', 'resolved')">
+                    <span>✅ Đánh dấu Đã xử lý</span>
+                  </button>
+                ` : `
+                  <button class="btn btn-secondary btn-sm" onclick="updateFeedbackStatus('${fb.id}', 'reviewed')">
+                    <span>🔄 Đặt lại Chờ xử lý</span>
+                  </button>
+                `}
+                <button class="btn btn-secondary btn-sm" onclick="promptFeedbackNote('${fb.id}', '${escapeHtml(fb.admin_note || '')}')">
+                  <span>📝 Phản hồi / Ghi chú</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" title="Chạy lại AI đánh giá" onclick="reEvaluateFeedback('${fb.id}')">
+                  <span>🤖 Thẩm định lại</span>
+                </button>
+              </div>
+
+              <button class="btn btn-danger btn-sm" onclick="deleteFeedback('${fb.id}')" title="Xóa góp ý này">
+                <span>✕ Xóa</span>
+              </button>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function updateFeedbackStatus(id, newStatus) {
+      try {
+        const res = await fetch('/api/admin/feedback/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminPasscode },
+          body: JSON.stringify({ id: id, status: newStatus })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showBanner('Đã cập nhật trạng thái ý kiến.', 'success');
+          await loadAdminFeedbacks();
+        } else {
+          showBanner('Lỗi: ' + data.message, 'error');
+        }
+      } catch (err) {
+        showBanner('Lỗi: ' + err.message, 'error');
+      }
+    }
+
+    async function promptFeedbackNote(id, currentNote) {
+      const note = prompt('Nhập nội dung phản hồi hoặc ghi chú của Quản trị viên:', currentNote || '');
+      if (note === null) return;
+
+      try {
+        const res = await fetch('/api/admin/feedback/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminPasscode },
+          body: JSON.stringify({ id: id, status: 'reviewed', admin_note: note.trim() })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showBanner('Đã lưu phản hồi của Admin.', 'success');
+          await loadAdminFeedbacks();
+        } else {
+          showBanner('Lỗi: ' + data.message, 'error');
+        }
+      } catch (err) {
+        showBanner('Lỗi: ' + err.message, 'error');
+      }
+    }
+
+    async function reEvaluateFeedback(id) {
+      try {
+        showBanner('AI đang phân tích và thẩm định lại ý kiến...', 'success');
+        const res = await fetch('/api/admin/feedback/re-evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminPasscode },
+          body: JSON.stringify({ id: id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showBanner('Đã thẩm định lại thành công bằng AI!', 'success');
+          await loadAdminFeedbacks();
+        } else {
+          showBanner('Lỗi: ' + data.message, 'error');
+        }
+      } catch (err) {
+        showBanner('Lỗi: ' + err.message, 'error');
+      }
+    }
+
+    async function deleteFeedback(id) {
+      if (!confirm('Bạn có chắc muốn xóa ý kiến này không?')) return;
+      try {
+        const res = await fetch('/api/admin/feedback/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminPasscode },
+          body: JSON.stringify({ id: id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showBanner('Đã xóa ý kiến.', 'success');
+          await loadAdminFeedbacks();
+        } else {
+          showBanner('Lỗi: ' + data.message, 'error');
+        }
+      } catch (err) {
+        showBanner('Lỗi: ' + err.message, 'error');
+      }
+    }
+
+    async function purgeSpamFeedbacks() {
+      if (!confirm('Bạn có chắc chắn muốn dọn sạch tất cả ý kiến bị xếp loại Cấp 10 (Rác / Spam) không?')) return;
+      try {
+        const res = await fetch('/api/admin/feedback/purge-spam', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminPasscode }
+        });
+        const data = await res.json();
+        if (data.success) {
+          showBanner(`Đã dọn sạch ${data.removed} bài spam cấp 10.`, 'success');
+          await loadAdminFeedbacks();
+        } else {
+          showBanner('Lỗi: ' + data.message, 'error');
         }
       } catch (err) {
         showBanner('Lỗi: ' + err.message, 'error');

@@ -16,7 +16,7 @@ class HCMUTEClient:
         base_url: str = "https://portalapi.hcmute.edu.vn/api/",
         api_key: str = "utepscRBF0zT2Mqo6vMw69YMOH43IrB2RtXBS0EHit2kzvL2auxaFJBvw==",
         client_id: str = "ute",
-        token_cache_file: str = "data/.token_cache.json",
+        token_cache_file: Optional[str] = "data/.token_cache.json",
     ):
         self.base_url = base_url.rstrip("/") + "/"
         self.api_key = api_key
@@ -24,7 +24,8 @@ class HCMUTEClient:
         self.token_cache_file = token_cache_file
         self.session_data: Optional[Dict[str, Any]] = None
         self.token: Optional[str] = None
-        self.load_cached_session()
+        if self.token_cache_file:
+            self.load_cached_session()
 
     def _headers(self, authenticated: bool = True) -> Dict[str, str]:
         headers = {
@@ -39,7 +40,7 @@ class HCMUTEClient:
 
     def load_cached_session(self) -> bool:
         """Load session from local cache file if still valid."""
-        if not os.path.exists(self.token_cache_file):
+        if not self.token_cache_file or not os.path.exists(self.token_cache_file):
             return False
 
         try:
@@ -64,9 +65,10 @@ class HCMUTEClient:
 
     def save_session(self, data: Dict[str, Any]) -> None:
         """Save session to local cache."""
-        os.makedirs(os.path.dirname(self.token_cache_file) or ".", exist_ok=True)
-        with open(self.token_cache_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        if self.token_cache_file:
+            os.makedirs(os.path.dirname(self.token_cache_file) or ".", exist_ok=True)
+            with open(self.token_cache_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
         self.session_data = data
         self.token = data.get("Token")
 
@@ -96,18 +98,18 @@ class HCMUTEClient:
         """Clear local session."""
         self.session_data = None
         self.token = None
-        if os.path.exists(self.token_cache_file):
+        if self.token_cache_file and os.path.exists(self.token_cache_file):
             try:
                 os.remove(self.token_cache_file)
             except OSError:
                 pass
-        # Clean up any legacy vault if it existed
-        vault_path = os.path.join(os.path.dirname(self.token_cache_file) or "data", ".auth_vault.json")
-        if os.path.exists(vault_path):
-            try:
-                os.remove(vault_path)
-            except OSError:
-                pass
+        if self.token_cache_file:
+            vault_path = os.path.join(os.path.dirname(self.token_cache_file) or "data", ".auth_vault.json")
+            if os.path.exists(vault_path):
+                try:
+                    os.remove(vault_path)
+                except OSError:
+                    pass
 
     def login(self, username: str, password: str, account_type: int = 0) -> Dict[str, Any]:
         """

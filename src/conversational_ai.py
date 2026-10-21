@@ -288,9 +288,9 @@ def format_classes_for_date(target_date: date, date_label: str, all_events: list
         lines.append("\nBạn có thể tranh thủ ngủ nướng một chút, tự ôn lại bài vở hoặc đi cà phê thư giãn nha! ☕✨")
 
     if cancelled_classes:
-        lines.append("\n⚠️ <i>Lưu ý: Có môn đã được giảng viên / sinh viên báo nghỉ:</i>")
+        lines.append("\n🏖️ <i>Lưu ý: Có môn đã được Giảng viên cho nghỉ:</i>")
         for cc in cancelled_classes:
-            lines.append(f" • ❌ {cc.title} (Đã xóa khỏi lịch)")
+            lines.append(f" • 🏖️ {cc.title} (Đã xóa khỏi lịch)")
 
     return "\n".join(lines)
 
@@ -473,14 +473,14 @@ def generate_conversational_reply(
     if any(w in norm for w in ["duoc nghi khong", "co nghi khong", "bao nghi", "nghi hoc", "co mon nao nghi", "thay co bao nghi"]):
         cancelled_list = [e for e in all_events if e.uid in cancelled_set and e.end_datetime >= now]
         if cancelled_list:
-            lines = [f"⚠️ <b>HIỆN TẠI CÓ {len(cancelled_list)} BUỔI HỌC ĐÃ ĐƯỢC BÁO NGHỈ:</b>\n"]
+            lines = [f"🏖️ <b>HIỆN TẠI CÓ {len(cancelled_list)} BUỔI HỌC GIẢNG VIÊN CHO NGHỈ:</b>\n"]
             for c in cancelled_list[:5]:
                 dt_str = c.start_datetime.strftime("%d/%m/%Y lúc %H:%M")
-                lines.append(f"• ❌ <b>{c.title}</b> ({dt_str})")
-            lines.append("\n✔ Các buổi học này đã được xóa khỏi Google Calendar của bạn rồi nha!")
+                lines.append(f"• 🏖️ <b>{c.title}</b> ({dt_str})")
+            lines.append("\n✔ Các buổi học này đã được xóa khỏi Lịch của bạn rồi nha!")
             return "\n".join(lines), None
         else:
-            return "✔ <b>Hiện tại không có buổi học nào bị báo nghỉ!</b>\nBạn đi học đúng giờ và nhớ chú ý an toàn trên đường đến trường nha! 🛵🏫", None
+            return "✔ <b>Hiện tại không có môn nào giảng viên cho nghỉ!</b>\nBạn đi học đúng giờ và nhớ chú ý an toàn trên đường đến trường nha! 🛵🏫", None
 
     # 6. Tuition & Deadlines (học phí, tiền học, deadline...)
     if any(w in norm for w in ["hoc phi", "tien hoc", "dong tien", "deadline", "han chot", "shcd", "tin chi"]):
@@ -563,7 +563,7 @@ def generate_conversational_reply(
             "• ☀️ <b>Nhắc lịch mỗi sáng:</b> 06:30 sáng tự động gửi môn học & phòng học trong ngày.\n"
             "• 📅 <b>Tra cứu lịch siêu nhanh:</b> Bạn chỉ cần hỏi tự nhiên <i>'mai học gì', 'thứ 5 học ở đâu', 'môn Triết học phòng nào'</i>...\n"
             "• 🔥 <b>Đếm ngược lịch thi:</b> Cảnh báo phòng thi, giờ thi cận kề.\n"
-            "• ❌ <b>Báo nghỉ Zalo cộng đồng:</b> Tự động phát hiện khi thầy cô báo nghỉ để xóa khỏi Google Calendar.\n\n"
+            "• 🏖️ <b>Đánh dấu GV cho nghỉ:</b> Tự động xóa khỏi Lịch khi thầy/cô thông báo cho nghỉ.\n\n"
             "Bạn thử nhắn <i>'mai học gì'</i> xem sao nha! 😉"
         )
         return intro, None
@@ -599,14 +599,14 @@ def generate_conversational_reply(
     if any(w in norm for w in ["duoc nghi khong", "co nghi khong", "bao nghi", "nghi hoc", "co mon nao nghi", "thay co bao nghi"]):
         cancelled_list = [e for e in all_events if e.uid in cancelled_set and e.end_datetime >= now]
         if cancelled_list:
-            lines = [f"⚠️ <b>HIỆN TẠI CÓ {len(cancelled_list)} BUỔI HỌC ĐÃ ĐƯỢC BÁO NGHỈ:</b>\n"]
+            lines = [f"🏖️ <b>HIỆN TẠI CÓ {len(cancelled_list)} BUỔI HỌC GIẢNG VIÊN CHO NGHỈ:</b>\n"]
             for c in cancelled_list[:5]:
                 dt_str = c.start_datetime.strftime("%d/%m/%Y lúc %H:%M")
-                lines.append(f"• ❌ <b>{c.title}</b> ({dt_str})")
-            lines.append("\n✔ Các buổi học này đã được xóa khỏi Google Calendar của bạn rồi nha!")
+                lines.append(f"• 🏖️ <b>{c.title}</b> ({dt_str})")
+            lines.append("\n✔ Các buổi học này đã được xóa khỏi Lịch của bạn rồi nha!")
             return "\n".join(lines), None
         else:
-            return "✔ <b>Hiện tại không có buổi học nào bị báo nghỉ!</b>\nBạn đi học đúng giờ và nhớ chú ý an toàn trên đường đến trường nha! 🛵🏫", None
+            return "✔ <b>Hiện tại không có môn nào giảng viên cho nghỉ!</b>\nBạn đi học đúng giờ và nhớ chú ý an toàn trên đường đến trường nha! 🛵🏫", None
 
     # H. Tuition & Deadlines (học phí, tiền học, deadline...)
     if any(w in norm for w in ["hoc phi", "tien hoc", "dong tien", "deadline", "han chot", "shcd", "tin chi"]):
