@@ -34,22 +34,13 @@ from src.telegram_bot import (
     load_cancellations,
     add_cancellation,
     save_config as save_tg_config,
+    load_config,
 )
 
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "config.json"))
 
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path="")
-
-
-def load_config() -> dict:
-    if os.path.exists(CONFIG_PATH):
-        try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
 
 
 def get_client() -> HCMUTEClient:

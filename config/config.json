@@ -116,7 +116,7 @@
   },
   "telegram": {
     "enabled": true,
-    "bot_token": "8937241728:AAF19m1tywa47Jp-0x1KS7PX-rn82ZQKaM4",
+    "bot_token": "",
     "chat_id": "",
     "morning_briefing": true,
     "morning_time": "06:30",
@@ -129,5 +129,5 @@
     "threshold_percent": 80,
     "min_votes": 2
   },
-  "admin_passcode": "Nththeking2407"
+  "admin_passcode": ""
 }

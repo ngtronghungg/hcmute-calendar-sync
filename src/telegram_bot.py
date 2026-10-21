@@ -122,20 +122,77 @@ def broadcast_telegram_message(bot_token: str, message: str) -> dict:
 
 
 def load_config() -> dict:
+    cfg = {}
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+                cfg = json.load(f)
+        except Exception:
+            cfg = {}
+
+    if "telegram" not in cfg:
+        cfg["telegram"] = {}
+
+    # 1. Local Private Secrets File (data/.secrets.json - Gitignored)
+    secrets_path = os.path.join(PROJECT_ROOT, "data", ".secrets.json")
+    if os.path.exists(secrets_path):
+        try:
+            with open(secrets_path, "r", encoding="utf-8") as sf:
+                secrets = json.load(sf)
+                if secrets.get("bot_token"):
+                    cfg["telegram"]["bot_token"] = secrets["bot_token"]
+                    cfg["telegram"]["enabled"] = True
+                if secrets.get("bot_username"):
+                    cfg["telegram"]["bot_username"] = secrets["bot_username"]
+                if secrets.get("admin_passcode"):
+                    cfg["admin_passcode"] = secrets["admin_passcode"]
         except Exception:
             pass
-    return {}
+
+    # 2. Environment Variables (Render, Docker, Cloud hosting)
+    env_token = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN")
+    if env_token:
+        cfg["telegram"]["bot_token"] = env_token.strip()
+        cfg["telegram"]["enabled"] = True
+
+    env_username = os.environ.get("TELEGRAM_BOT_USERNAME")
+    if env_username:
+        cfg["telegram"]["bot_username"] = env_username.strip()
+
+    env_admin = os.environ.get("ADMIN_PASSCODE")
+    if env_admin:
+        cfg["admin_passcode"] = env_admin.strip()
+
+    return cfg
 
 
 def save_config(cfg: dict) -> bool:
     try:
+        # Save sensitive secrets into local gitignored file (data/.secrets.json)
+        secrets = {}
+        if cfg.get("telegram", {}).get("bot_token"):
+            secrets["bot_token"] = cfg["telegram"]["bot_token"]
+        if cfg.get("telegram", {}).get("bot_username"):
+            secrets["bot_username"] = cfg["telegram"]["bot_username"]
+        if cfg.get("admin_passcode"):
+            secrets["admin_passcode"] = cfg["admin_passcode"]
+
+        if secrets:
+            secrets_path = os.path.join(PROJECT_ROOT, "data", ".secrets.json")
+            os.makedirs(os.path.dirname(secrets_path), exist_ok=True)
+            with open(secrets_path, "w", encoding="utf-8") as sf:
+                json.dump(secrets, sf, ensure_ascii=False, indent=2)
+
+        # Keep config/config.json free of raw secrets for safe GitHub commits
+        clean_cfg = json.loads(json.dumps(cfg))
+        if "telegram" in clean_cfg and clean_cfg["telegram"].get("bot_token"):
+            clean_cfg["telegram"]["bot_token"] = ""
+        if clean_cfg.get("admin_passcode"):
+            clean_cfg["admin_passcode"] = ""
+
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, ensure_ascii=False, indent=2)
+            json.dump(clean_cfg, f, ensure_ascii=False, indent=2)
         return True
     except Exception:
         return False
