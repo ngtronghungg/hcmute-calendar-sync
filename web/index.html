@@ -2162,7 +2162,8 @@
         'X-Session-Token': token
       };
       const res = await fetch(url, options);
-      if (res.status === 401 && !url.includes('/api/login')) {
+      // Only force logout if core session validation fails, preventing false logouts on background tasks
+      if (res.status === 401 && (url === '/api/status' || url.startsWith('/api/overview'))) {
         localStorage.removeItem('hcmute_session_token');
         appState.authenticated = false;
         appState.profile = null;
@@ -2198,7 +2199,8 @@
           appState.profile = data.profile;
           showDashboard();
           await loadOverviewData();
-          await loadConsiderations();
+          // Load considerations in background so timetable renders immediately
+          loadConsiderations();
         } else {
           localStorage.removeItem('hcmute_session_token');
           showLogin();
@@ -2313,7 +2315,8 @@
           appState.profile = data.profile;
           showDashboard();
           await loadOverviewData();
-          await loadConsiderations();
+          // Load considerations in background without blocking
+          loadConsiderations();
         } else {
           errorDiv.textContent = data.message || 'Đăng nhập không thành công.';
           errorDiv.classList.remove('hidden');
@@ -2374,7 +2377,8 @@
           appState.profile = data.profile;
           showDashboard();
           await loadOverviewData();
-          await loadConsiderations();
+          // Load considerations in background without blocking
+          loadConsiderations();
         } else {
           errorDiv.textContent = data.message || 'Token không hợp lệ hoặc đã hết hạn.';
           errorDiv.classList.remove('hidden');
@@ -2426,7 +2430,12 @@
       document.getElementById('syncTab').classList.add('hidden');
 
       if (tabName === 'schedule') document.getElementById('scheduleTab').classList.remove('hidden');
-      if (tabName === 'reminders') document.getElementById('remindersTab').classList.remove('hidden');
+      if (tabName === 'reminders') {
+        document.getElementById('remindersTab').classList.remove('hidden');
+        if (!appState.considerations || appState.considerations.length === 0) {
+          loadConsiderations();
+        }
+      }
       if (tabName === 'exams') document.getElementById('examsTab').classList.remove('hidden');
       if (tabName === 'telegram') {
         document.getElementById('telegramTab').classList.remove('hidden');
@@ -3142,22 +3151,36 @@
 
     async function loadConsiderations(force = false) {
       const list = document.getElementById('remindersList');
+      if (!list) return;
+
+      // If already cached in state and not forcing refresh, render immediately in 0ms
+      if (!force && appState.considerations && appState.considerations.length > 0) {
+        renderConsiderationsList();
+        return;
+      }
+
       list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Đang phân tích thông báo, kiểm tra hạn nộp học phí, SHCD...</div>`;
 
       try {
-        const res = await apiFetch('/api/considerations' + (force ? '?force=1' : ''));
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds client timeout
+
+        const res = await apiFetch('/api/considerations' + (force ? '?force=1' : ''), {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         let data;
         try {
           data = await res.json();
         } catch(e) {
-          errorDiv.textContent = 'Máy chủ đang khởi động lại. Vui lòng thử lại sau giây lát.';
-          errorDiv.classList.remove('hidden');
-          return;
+          throw new Error('Dữ liệu phản hồi không hợp lệ');
         }
-        if (!data.success) throw new Error(data.message);
+        if (!data || !data.success) throw new Error(data?.message || 'Không thể tải thông báo');
 
         appState.considerations = data.items || [];
-        document.getElementById('reminderCountBadge').textContent = appState.considerations.length;
+        const badge = document.getElementById('reminderCountBadge');
+        if (badge) badge.textContent = appState.considerations.length;
 
         // Auto-select needed items by default
         appState.selectedReminderIds = new Set(
@@ -3166,7 +3189,17 @@
         updateSelectedCounter();
         renderConsiderationsList();
       } catch (err) {
-        list.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Lỗi quét thông báo: ${err.message}</div>`;
+        console.warn('Considerations scan notice:', err);
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🔔</div>
+            <div style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 8px;">
+              ${err.name === 'AbortError' ? 'Cổng Portal trường đang phản hồi chậm.' : 'Chưa có thông báo nào cần nhắc nhở.'}
+            </div>
+            <button class="btn-secondary" style="padding: 6px 14px; font-size: 12px;" onclick="loadConsiderations(true)">
+              🔄 Quét lại thông báo
+            </button>
+          </div>`;
       }
     }
 

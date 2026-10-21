@@ -308,22 +308,43 @@ def format_classes_for_date(target_date: date, date_label: str, all_events: list
     return "\n".join(lines)
 
 
-def format_next_exam(client: Any = None, chat_id: Optional[str] = None) -> str:
+def format_next_exam(
+    client: Any = None,
+    chat_id: Optional[str] = None,
+    all_events: Optional[list] = None,
+    student_mssv: Optional[str] = None,
+    student_name: Optional[str] = None,
+) -> str:
     """Format specifically the upcoming exam closest to current date and time."""
     from src.telegram_bot import load_feed_cache, load_cached_exams, get_student_identity
-    all_events = load_feed_cache()
+
+    if not student_name or not student_mssv:
+        s_name, s_mssv = get_student_identity(chat_id, client)
+        student_name = student_name or s_name
+        student_mssv = student_mssv or s_mssv or (str(chat_id).strip() if chat_id and str(chat_id).isalnum() else "")
+
+    # 1. Use passed all_events if available
+    events_pool = list(all_events or [])
+    if not events_pool:
+        events_pool = load_feed_cache(mssv=student_mssv)
+
+    # 2. Extract exams from events pool
     exams = [
-        e for e in all_events
-        if (getattr(e, "event_type", "") or "").upper() in ("EXAM", "THI") or "THI" in (e.title or "").upper()
+        e for e in events_pool
+        if (getattr(e, "event_type", "") or "").upper() in ("EXAM", "THI")
+        or (e.title or "").upper().startswith("[LỊCH THI]")
+        or (e.title or "").upper().startswith("[THI]")
     ]
+
+    # 3. If still no exams, check student's cached exams or global cached exams
     if not exams:
-        exams = load_cached_exams()
+        exams = load_cached_exams(mssv=student_mssv)
+    if not exams and student_mssv:
+        exams = load_cached_exams(mssv=None)
 
     now = get_vietnam_now()
     upcoming = [e for e in exams if e.end_datetime >= now]
     upcoming.sort(key=lambda x: x.start_datetime)
-
-    student_name, student_mssv = get_student_identity(chat_id, client)
 
     if not upcoming:
         if exams:
@@ -356,7 +377,7 @@ def format_next_exam(client: Any = None, chat_id: Optional[str] = None) -> str:
     ]
 
     if len(upcoming) > 1:
-        lines.append(f"<i>(Sau môn này bạn còn {len(upcoming) - 1} môn thi nữa. Bấm '📝 Lịch thi' để xem toàn bộ danh sách nhé!)</i>")
+        lines.append(f"<i>(Sau môn này bạn còn {len(upcoming) - 1} môn thi nữa. Bấm tab '📝 Lịch thi' để xem toàn bộ danh sách nhé!)</i>")
     else:
         lines.append("<i>Đây là môn thi cuối cùng trong kỳ này của bạn rồi đó! Chúc bạn thi thật tốt và đạt điểm cao nha! 💪🎓</i>")
 
@@ -624,9 +645,9 @@ def generate_conversational_reply(
     if is_exam_query:
         is_next_exam = any(w in norm for w in ["ke tiep", "tiep theo", "sap thi", "gan nhat", "toi day", "tiep"])
         if is_next_exam or "mon thi" in norm:
-            return format_next_exam(client, chat_id=chat_id), None
+            return format_next_exam(client, chat_id=chat_id, all_events=all_events, student_mssv=student_mssv, student_name=student_name), None
         from src.telegram_bot import format_upcoming_exams
-        return format_upcoming_exams(client, chat_id=chat_id), None
+        return format_upcoming_exams(client, chat_id=chat_id, all_events=all_events, student_mssv=student_mssv, student_name=student_name), None
 
     # 4. Specific Subject Search (môn Triết, môn CTM, môn kỹ thuật thủy lực khí nén học phòng nào...)
     course_kw = extract_course_search_keyword(text)

@@ -781,21 +781,37 @@ def format_today_schedule(client: HCMUTEClient, chat_id: Optional[str] = None) -
     return "\n".join(lines)
 
 
-def format_upcoming_exams(client: HCMUTEClient, chat_id: Optional[str] = None) -> str:
+def format_upcoming_exams(
+    client: HCMUTEClient,
+    chat_id: Optional[str] = None,
+    all_events: Optional[list] = None,
+    student_mssv: Optional[str] = None,
+    student_name: Optional[str] = None,
+) -> str:
     """Generate upcoming exam schedule instantly from cache."""
-    all_events = load_feed_cache()
+    if not student_name or not student_mssv:
+        s_name, s_mssv = get_student_identity(chat_id, client)
+        student_name = student_name or s_name
+        student_mssv = student_mssv or s_mssv or (str(chat_id).strip() if chat_id and str(chat_id).isalnum() else "")
+
+    events_pool = list(all_events or [])
+    if not events_pool:
+        events_pool = load_feed_cache(mssv=student_mssv)
+
     exams = [
-        e for e in all_events
-        if (e.event_type or "").upper() in ("EXAM", "THI") or "THI" in (e.title or "").upper()
+        e for e in events_pool
+        if (getattr(e, "event_type", "") or "").upper() in ("EXAM", "THI")
+        or (e.title or "").upper().startswith("[LỊCH THI]")
+        or (e.title or "").upper().startswith("[THI]")
     ]
     if not exams:
-        exams = load_cached_exams()
+        exams = load_cached_exams(mssv=student_mssv)
+    if not exams and student_mssv:
+        exams = load_cached_exams(mssv=None)
 
     now = get_vietnam_now()
     upcoming = [e for e in exams if e.start_datetime >= now - timedelta(days=7)]
     upcoming.sort(key=lambda x: x.start_datetime)
-
-    student_name, student_mssv = get_student_identity(chat_id, client)
 
     if not upcoming:
         if exams:

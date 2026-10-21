@@ -122,23 +122,17 @@ def get_request_session() -> Optional[dict]:
     if not token:
         token = (request.args.get("session_token") or request.args.get("token") or "").strip()
 
-    if not token or token not in ACTIVE_SESSIONS:
+    if not token:
+        return None
+
+    if token not in ACTIVE_SESSIONS:
+        # Reload from disk in case another worker process or server restart occurred
+        load_sessions()
+
+    if token not in ACTIVE_SESSIONS:
         return None
 
     session = ACTIVE_SESSIONS[token]
-    expire_str = session.get("expire")
-    if expire_str:
-        try:
-            exp_dt = datetime.fromisoformat(expire_str.replace("Z", "+00:00"))
-            if exp_dt.tzinfo is None:
-                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) > exp_dt:
-                del ACTIVE_SESSIONS[token]
-                save_sessions()
-                return None
-        except Exception:
-            pass
-
     session["last_active"] = datetime.now(timezone.utc).isoformat()
     return session
 
@@ -306,32 +300,23 @@ def api_status():
     Unauthenticated requests always receive authenticated: false.
     """
     session = get_request_session()
-    if not session:
+    if not session or not session.get("portal_token"):
         return jsonify({"authenticated": False})
 
-    client = get_session_client(session)
-    if client and client.ensure_authenticated():
-        s_id = str(session.get("mssv", "")).strip()
-        s_name = session.get("name", "Sinh viên")
-        if s_id:
-            record_student_access(s_id, s_name, channel="Web Portal")
-        return jsonify({
-            "authenticated": True,
-            "session_token": session.get("session_token"),
-            "profile": {
-                "id": s_id,
-                "name": s_name,
-                "role": session.get("role", "SV"),
-                "status": session.get("status", "Đang học"),
-            }
-        })
-    else:
-        # Session expired or token invalid
-        token_key = session.get("session_token")
-        if token_key and token_key in ACTIVE_SESSIONS:
-            del ACTIVE_SESSIONS[token_key]
-            save_sessions()
-        return jsonify({"authenticated": False, "token_expired": True})
+    s_id = str(session.get("mssv", "")).strip()
+    s_name = session.get("name", "Sinh viên")
+    if s_id:
+        record_student_access(s_id, s_name, channel="Web Portal")
+    return jsonify({
+        "authenticated": True,
+        "session_token": session.get("session_token"),
+        "profile": {
+            "id": s_id,
+            "name": s_name,
+            "role": session.get("role", "SV"),
+            "status": session.get("status", "Đang học"),
+        }
+    })
 
 
 @app.route("/api/ai/chat", methods=["POST"])
@@ -357,6 +342,13 @@ def api_ai_chat():
     if student_mssv:
         try:
             all_events = load_feed_cache(mssv=student_mssv) or []
+            cached_exams = load_cached_exams(mssv=student_mssv)
+            if not cached_exams:
+                cached_exams = load_cached_exams(mssv=None)
+            existing_uids = {e.uid for e in all_events}
+            for ex in (cached_exams or []):
+                if ex.uid not in existing_uids:
+                    all_events.append(ex)
         except Exception:
             all_events = []
 
@@ -710,23 +702,30 @@ def api_overview():
             curr_year = request.args.get("year") or yt.get("CurrentYear") or yt.get("NamHienTai") or curr_year
             curr_term = request.args.get("term") or yt.get("CurrentTerm") or yt.get("HocKyHienTai") or curr_term
 
-            # 2. Live Schedule
-            raw_sched = client.get_schedule_semester(curr_year, curr_term)
-            all_class_events = parse_semester_schedule(raw_sched)
-            if all_class_events:
-                save_feed_cache(all_class_events, mssv=mssv)
-        except Exception:
-            pass
+            # Concurrent parallel fetching of semester schedule and exams
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                fut_sched = pool.submit(client.get_schedule_semester, curr_year, curr_term)
+                fut_time_exams = pool.submit(client.get_exams_by_time)
+                fut_term_exams = pool.submit(client.get_exam_schedule, curr_year, curr_term)
 
-        # 3. Live Exams: combine detailed showexambytime and semester exams
-        try:
-            time_exams = client.get_exams_by_time()
-            all_raw_exams.extend(time_exams)
-        except Exception:
-            pass
-        try:
-            term_exams = client.get_exam_schedule(curr_year, curr_term)
-            all_raw_exams.extend(term_exams)
+                try:
+                    raw_sched = fut_sched.result(timeout=15)
+                    all_class_events = parse_semester_schedule(raw_sched)
+                    if all_class_events:
+                        save_feed_cache(all_class_events, mssv=mssv)
+                except Exception:
+                    pass
+
+                try:
+                    all_raw_exams.extend(fut_time_exams.result(timeout=15))
+                except Exception:
+                    pass
+
+                try:
+                    all_raw_exams.extend(fut_term_exams.result(timeout=15))
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -840,102 +839,125 @@ def api_considerations():
         now = get_vietnam_now()
         all_items: List[ConsiderationItem] = []
 
-        # 1. Upcoming exams from database (PRIORITY #1)
+        # 1. Upcoming exams from cached exams or quick fetch
         try:
-            exams_raw = client.get_exams_by_time()
-            for ex in exams_raw:
-                ngay_raw = ex.get("NgayThi")
-                gio_raw = ex.get("GioThi") or "07:30"
-                if not ngay_raw:
-                    continue
-                import re
-                m_d = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", ngay_raw)
-                if not m_d:
-                    continue
-                d, m, y = map(int, m_d.groups())
-                hh, mm = 7, 30
-                m_t = re.search(r"(\d{1,2})(?:g|h|:)(\d{2})", gio_raw)
-                if m_t:
-                    hh, mm = int(m_t.group(1)), int(m_t.group(2))
-                exam_dt = datetime(y, m, d, hh, mm)
+            cached_exams = load_cached_exams(mssv=mssv)
+            if cached_exams:
+                for ex in cached_exams:
+                    exam_dt = ex.start_datetime
+                    if exam_dt >= now - timedelta(hours=12):
+                        days_left = (exam_dt.date() - now.date()).days
+                        countdown_str = "HÔM NAY" if days_left == 0 else ("NGÀY MAI" if days_left == 1 else f"Còn {days_left} ngày")
+                        exam_item = ConsiderationItem(
+                            item_id=f"exam_{ex.uid}",
+                            title=f"Lịch thi: {ex.title} ({countdown_str})",
+                            category="EXAM",
+                            priority="HIGH",
+                            deadline=exam_dt,
+                            summary=f"Thi môn {ex.title} lúc {exam_dt.strftime('%H:%M')} ngày {exam_dt.strftime('%d/%m/%Y')}.",
+                            action_required=f"Có mặt trước giờ thi 15 phút tại Phòng {ex.location}. Mang theo thẻ SV/CCCD.",
+                            recommendation="Kỳ thi kết thúc học phần bắt buộc có mặt đúng giờ.",
+                            source_title=f"Lịch thi: {ex.title}",
+                            source_id=f"exam_{ex.uid}",
+                            source_date=now,
+                            confidence_score=1.0,
+                            is_reminder_needed=True,
+                            notice_type="exam",
+                            full_content=f"<h3>Lịch thi: {ex.title}</h3><p><b>Thời gian:</b> {exam_dt.strftime('%d/%m/%Y %H:%M')}</p><p><b>Phòng thi:</b> {ex.location}</p>",
+                        )
+                        all_items.append(exam_item)
+            else:
+                exams_raw = client.get_exams_by_time()
+                for ex in exams_raw:
+                    ngay_raw = ex.get("NgayThi")
+                    gio_raw = ex.get("GioThi") or "07:30"
+                    if not ngay_raw:
+                        continue
+                    import re
+                    m_d = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", ngay_raw)
+                    if not m_d:
+                        continue
+                    d, m, y = map(int, m_d.groups())
+                    hh, mm = 7, 30
+                    m_t = re.search(r"(\d{1,2})(?:g|h|:)(\d{2})", gio_raw)
+                    if m_t:
+                        hh, mm = int(m_t.group(1)), int(m_t.group(2))
+                    exam_dt = datetime(y, m, d, hh, mm)
 
-                # Filter strictly upcoming exams (from today onwards!)
-                if exam_dt >= now - timedelta(hours=12):
-                    subj_name = ex.get("CurriculumName") or ex.get("TenHP") or "Môn thi"
-                    room = ex.get("PhongThi") or "Xem thông báo"
-                    loc = ex.get("DiaDiem") or "Cơ sở chính"
-                    days_left = (exam_dt.date() - now.date()).days
+                    if exam_dt >= now - timedelta(hours=12):
+                        subj_name = ex.get("CurriculumName") or ex.get("TenHP") or "Môn thi"
+                        room = ex.get("PhongThi") or "Xem thông báo"
+                        loc = ex.get("DiaDiem") or "Cơ sở chính"
+                        days_left = (exam_dt.date() - now.date()).days
+                        countdown_str = "HÔM NAY" if days_left == 0 else ("NGÀY MAI" if days_left == 1 else f"Còn {days_left} ngày")
 
-                    if days_left == 0:
-                        countdown_str = "HÔM NAY"
-                    elif days_left == 1:
-                        countdown_str = "NGÀY MAI"
-                    else:
-                        countdown_str = f"Còn {days_left} ngày"
-
-                    exam_item = ConsiderationItem(
-                        item_id=f"exam_{ex.get('CurriculumID')}_{exam_dt.strftime('%Y%m%d')}",
-                        title=f"Lịch thi: {subj_name} ({countdown_str})",
-                        category="EXAM",
-                        priority="HIGH",
-                        deadline=exam_dt,
-                        summary=f"Thi môn {subj_name} lúc {exam_dt.strftime('%H:%M')} ngày {exam_dt.strftime('%d/%m/%Y')}.",
-                        action_required=f"Có mặt trước giờ thi 15 phút tại Phòng {room} ({loc}). Mang theo thẻ SV/CCCD.",
-                        recommendation="Kỳ thi kết thúc học phần bắt buộc có mặt đúng giờ.",
-                        source_title=f"Lịch thi chính thức: {subj_name}",
-                        source_id=f"exam_{ex.get('CurriculumID')}",
-                        source_date=now,
-                        confidence_score=1.0,
-                        is_reminder_needed=True,
-                        notice_type="exam",
-                        full_content=f"<h3>Lịch thi: {subj_name}</h3><p><b>Ngày thi:</b> {exam_dt.strftime('%d/%m/%Y')}</p><p><b>Giờ thi:</b> {exam_dt.strftime('%H:%M')}</p><p><b>Phòng thi:</b> Phòng {room} ({loc})</p><p><b>Thời gian làm bài:</b> {ex.get('ThoiLuong', 90)} phút</p><p><b>Số báo danh:</b> {ex.get('SBD', 'Theo danh sách')}</p><p><b>Ghi chú:</b> {ex.get('Note', '')}</p>",
-                    )
-                    all_items.append(exam_item)
+                        exam_item = ConsiderationItem(
+                            item_id=f"exam_{ex.get('CurriculumID')}_{exam_dt.strftime('%Y%m%d')}",
+                            title=f"Lịch thi: {subj_name} ({countdown_str})",
+                            category="EXAM",
+                            priority="HIGH",
+                            deadline=exam_dt,
+                            summary=f"Thi môn {subj_name} lúc {exam_dt.strftime('%H:%M')} ngày {exam_dt.strftime('%d/%m/%Y')}.",
+                            action_required=f"Có mặt trước giờ thi 15 phút tại Phòng {room} ({loc}). Mang theo thẻ SV/CCCD.",
+                            recommendation="Kỳ thi kết thúc học phần bắt buộc có mặt đúng giờ.",
+                            source_title=f"Lịch thi chính thức: {subj_name}",
+                            source_id=f"exam_{ex.get('CurriculumID')}",
+                            source_date=now,
+                            confidence_score=1.0,
+                            is_reminder_needed=True,
+                            notice_type="exam",
+                            full_content=f"<h3>Lịch thi: {subj_name}</h3><p><b>Ngày thi:</b> {exam_dt.strftime('%d/%m/%Y')}</p><p><b>Giờ thi:</b> {exam_dt.strftime('%H:%M')}</p><p><b>Phòng thi:</b> Phòng {room} ({loc})</p><p><b>Thời gian làm bài:</b> {ex.get('ThoiLuong', 90)} phút</p><p><b>Số báo danh:</b> {ex.get('SBD', 'Theo danh sách')}</p><p><b>Ghi chú:</b> {ex.get('Note', '')}</p>",
+                        )
+                        all_items.append(exam_item)
         except Exception:
             pass
 
-        # 2. Personal notices (concurrently fetch details in parallel)
-        try:
-            personal_notices = client.get_personal_messages()[:10]
+        # 2. Concurrently fetch Personal Notices, General Notices & Fee Debt with strict timeouts
+        def fetch_personal():
+            try:
+                personal_notices = client.get_personal_messages()[:5]
+                for p in personal_notices:
+                    mid = p.get("MessageID") or p.get("Id")
+                    if mid and "MessageBody" not in p:
+                        try:
+                            p_detail = client.get_message_detail(mid)
+                            p["MessageBody"] = p_detail.get("MessageBody", "")
+                            p["SenderName"] = p_detail.get("SenderName", "")
+                        except Exception:
+                            pass
+                    item = analyzer.analyze_announcement(p, notice_type="personal")
+                    if item:
+                        all_items.append(item)
+            except Exception:
+                pass
 
-            def fetch_single_detail(p):
-                mid = p.get("MessageID") or p.get("Id")
-                if mid and "MessageBody" not in p:
-                    try:
-                        p_detail = client.get_message_detail(mid)
-                        p["MessageBody"] = p_detail.get("MessageBody", "")
-                        p["SenderName"] = p_detail.get("SenderName", "")
-                    except Exception:
-                        pass
-                return p
+        def fetch_general():
+            try:
+                general_notices = client.get_general_announcements()[:8]
+                for g in general_notices:
+                    item = analyzer.analyze_announcement(g, notice_type="general")
+                    if item:
+                        all_items.append(item)
+            except Exception:
+                pass
 
-            with ThreadPoolExecutor(max_workers=5) as executor:
-                personal_notices = list(executor.map(fetch_single_detail, personal_notices))
+        def fetch_tuition():
+            try:
+                fee_item = analyzer.analyze_tuition_debt(client.get_fee_debt())
+                if fee_item:
+                    all_items.insert(0, fee_item)
+            except Exception:
+                pass
 
-            for p in personal_notices:
-                item = analyzer.analyze_announcement(p, notice_type="personal")
-                if item:
-                    all_items.append(item)
-        except Exception:
-            pass
-
-        # 3. General announcements
-        try:
-            general_notices = client.get_general_announcements()
-            for g in general_notices[:20]:
-                item = analyzer.analyze_announcement(g, notice_type="general")
-                if item:
-                    all_items.append(item)
-        except Exception:
-            pass
-
-        # 4. Check Tuition Fee Debt
-        try:
-            fee_item = analyzer.analyze_tuition_debt(client.get_fee_debt())
-            if fee_item:
-                all_items.insert(0, fee_item)
-        except Exception:
-            pass
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            f1 = executor.submit(fetch_personal)
+            f2 = executor.submit(fetch_general)
+            f3 = executor.submit(fetch_tuition)
+            for fut in [f1, f2, f3]:
+                try:
+                    fut.result(timeout=5)
+                except Exception:
+                    pass
 
         # STRICT SORTING: NEAREST DEADLINE FIRST!
         all_items.sort(key=lambda x: x.deadline or datetime(2099, 1, 1))

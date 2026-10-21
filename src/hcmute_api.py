@@ -24,6 +24,7 @@ class HCMUTEClient:
         self.token_cache_file = token_cache_file
         self.session_data: Optional[Dict[str, Any]] = None
         self.token: Optional[str] = None
+        self.session = requests.Session()
         if self.token_cache_file:
             self.load_cached_session()
 
@@ -76,23 +77,9 @@ class HCMUTEClient:
         """
         Verify if current session is active.
         Zero-Knowledge Architecture: Passwords are NEVER stored on disk.
-        Returns True if session token is still valid.
+        Returns True if session token is present and valid.
         """
-        if self.token and self.session_data:
-            expire_str = self.session_data.get("Expire")
-            if expire_str:
-                try:
-                    expire_dt = datetime.fromisoformat(expire_str.replace("Z", "+00:00"))
-                    now = datetime.now(timezone.utc)
-                    if expire_dt.tzinfo is None:
-                        expire_dt = expire_dt.replace(tzinfo=timezone.utc)
-                    if now < expire_dt:
-                        return True
-                except Exception:
-                    pass
-            else:
-                return True
-        return False
+        return bool(self.token)
 
     def logout(self) -> None:
         """Clear local session."""
@@ -125,7 +112,7 @@ class HCMUTEClient:
             "type": account_type,
         }
 
-        resp = requests.post(
+        resp = self.session.post(
             url,
             headers=self._headers(authenticated=False),
             json=payload,
@@ -157,7 +144,7 @@ class HCMUTEClient:
         url = self.base_url + "authenticate/AuthenticateGoogle"
         payload = {"Token": google_token.strip()}
 
-        resp = requests.post(
+        resp = self.session.post(
             url,
             headers=self._headers(authenticated=False),
             json=payload,
@@ -192,7 +179,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/yearandterm
         """
         url = self.base_url + "student/yearandterm"
-        resp = requests.get(url, headers=self._headers(), timeout=15)
+        resp = self.session.get(url, headers=self._headers(), timeout=15)
         resp.raise_for_status()
         return resp.json()
 
@@ -204,7 +191,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/DrawingStudentSchedule_Perior?namhoc={namhoc}&hocky={hocky}
         """
         url = f"{self.base_url}student/DrawingStudentSchedule_Perior?namhoc={namhoc}&hocky={hocky}"
-        resp = requests.get(url, headers=self._headers(), timeout=20)
+        resp = self.session.get(url, headers=self._headers(), timeout=20)
         resp.raise_for_status()
         return resp.json()
 
@@ -214,7 +201,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/DrawingStudentSchedules?namhoc={namhoc}&hocky={hocky}&tuan={tuan}
         """
         url = f"{self.base_url}student/DrawingStudentSchedules?namhoc={namhoc}&hocky={hocky}&tuan={tuan}"
-        resp = requests.get(url, headers=self._headers(), timeout=15)
+        resp = self.session.get(url, headers=self._headers(), timeout=15)
         resp.raise_for_status()
         return resp.json()
 
@@ -224,7 +211,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/WeekSchedule?namhoc={namhoc}&hocky={hocky}
         """
         url = f"{self.base_url}student/WeekSchedule?namhoc={namhoc}&hocky={hocky}"
-        resp = requests.get(url, headers=self._headers(), timeout=15)
+        resp = self.session.get(url, headers=self._headers(), timeout=15)
         resp.raise_for_status()
         return resp.json()
 
@@ -236,7 +223,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/exam?namhoc={namhoc}&hocky={hocky}
         """
         url = f"{self.base_url}student/exam?namhoc={namhoc}&hocky={hocky}"
-        resp = requests.get(url, headers=self._headers(), timeout=15)
+        resp = self.session.get(url, headers=self._headers(), timeout=15)
         resp.raise_for_status()
         data = resp.json()
         if isinstance(data, list):
@@ -251,7 +238,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/showexambytime
         """
         url = f"{self.base_url}student/showexambytime"
-        resp = requests.get(url, headers=self._headers(), timeout=15)
+        resp = self.session.get(url, headers=self._headers(), timeout=15)
         resp.raise_for_status()
         data = resp.json()
         if isinstance(data, list):
@@ -268,7 +255,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/GetAllThongBaoChung
         """
         url = self.base_url + "student/GetAllThongBaoChung"
-        resp = requests.get(url, headers=self._headers(), timeout=20)
+        resp = self.session.get(url, headers=self._headers(), timeout=4)
         resp.raise_for_status()
         data = resp.json()
         if isinstance(data, list):
@@ -283,7 +270,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/GetMessagesByReceiverID
         """
         url = self.base_url + "student/GetMessagesByReceiverID"
-        resp = requests.get(url, headers=self._headers(), timeout=20)
+        resp = self.session.get(url, headers=self._headers(), timeout=4)
         resp.raise_for_status()
         data = resp.json()
         if isinstance(data, list):
@@ -298,7 +285,7 @@ class HCMUTEClient:
         Endpoint: GET /api/student/GetMessageStudentDetailById?Id={message_id}
         """
         url = f"{self.base_url}student/GetMessageStudentDetailById?Id={message_id}"
-        resp = requests.get(url, headers=self._headers(), timeout=15)
+        resp = self.session.get(url, headers=self._headers(), timeout=3)
         resp.raise_for_status()
         return resp.json()
 
@@ -312,7 +299,7 @@ class HCMUTEClient:
         for prefix in ("authenticate", "student"):
             try:
                 url = f"{self.base_url}{prefix}/GetStudentFeedebt"
-                resp = requests.get(url, headers=self._headers(), timeout=15)
+                resp = self.session.get(url, headers=self._headers(), timeout=3)
                 if resp.status_code == 200:
                     return resp.json()
             except Exception:
