@@ -9,6 +9,13 @@ import json
 import webbrowser
 from threading import Timer
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Ensure project root is in sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
@@ -54,6 +61,11 @@ def get_client() -> HCMUTEClient:
         client_id=hcmute_cfg.get("client_id", "ute"),
         token_cache_file="data/.token_cache.json",
     )
+
+
+# Start Telegram daemon in background (handles polling fallback and morning briefings)
+bot_daemon = TelegramBotDaemon(get_client)
+bot_daemon.start()
 
 
 CALENDAR_FEED_CACHE_FILE = "data/calendar_feed_cache.json"
@@ -1455,9 +1467,9 @@ def run_app(port: int = None, open_browser: bool = True):
     host = "0.0.0.0" if is_cloud else "127.0.0.1"
     url = f"http://localhost:{port}"
 
-    # Start Telegram background daemon
-    bot_daemon = TelegramBotDaemon(get_client)
-    bot_daemon.start()
+    # Start Telegram background daemon if not already started
+    if not bot_daemon.running:
+        bot_daemon.start()
 
     if open_browser and not is_cloud:
         Timer(1.2, lambda: webbrowser.open(url)).start()

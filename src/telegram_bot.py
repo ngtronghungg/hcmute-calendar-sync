@@ -16,6 +16,13 @@ import requests
 from datetime import datetime, date, timedelta
 from typing import Optional, Dict, Any, List
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Ensure project root in sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
@@ -766,7 +773,10 @@ class TelegramBotDaemon:
         self.running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
-        print("🤖 Telegram Bot Background Service đã khởi động.")
+        try:
+            print("🤖 Telegram Bot Background Service đã khởi động.")
+        except Exception:
+            print("[Telegram Bot] Background Service started.")
 
     def stop(self):
         self.running = False
@@ -818,6 +828,10 @@ class TelegramBotDaemon:
 
         try:
             resp = requests.get(url, params=params, timeout=5)
+            if resp.status_code == 409:
+                # Webhook is currently active; let webhook handle updates
+                time.sleep(10)
+                return
             if resp.status_code != 200:
                 return
 
@@ -1135,6 +1149,13 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
     last_name = from_user.get("last_name", "")
     full_name = f"{first_name} {last_name}".strip() or "Sinh viên"
     tg_username = from_user.get("username", "")
+
+    # Always ensure user is registered in system roster whenever they chat with bot
+    register_or_update_telegram_user(
+        chat_id=chat_id,
+        name=full_name,
+        username=tg_username,
+    )
 
     # Seamless Feature: Auto-detect MSSV or Phone Number (7 to 11 digits)
     import re

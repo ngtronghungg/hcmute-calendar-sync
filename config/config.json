@@ -115,17 +115,19 @@
     }
   },
   "telegram": {
-    "enabled": false,
-    "bot_token": "",
+    "enabled": true,
+    "bot_token": "8937241728:AAF19m1tywa47Jp-0x1KS7PX-rn82ZQKaM4",
     "chat_id": "",
     "morning_briefing": true,
     "morning_time": "06:30",
     "exam_alert": true,
-    "diff_alert": true
+    "diff_alert": true,
+    "bot_username": "hcmute_calendar_bot"
   },
   "crowdsource_cancellation": {
     "enabled": true,
     "threshold_percent": 80,
     "min_votes": 2
-  }
+  },
+  "admin_passcode": "Nththeking2407"
 }
