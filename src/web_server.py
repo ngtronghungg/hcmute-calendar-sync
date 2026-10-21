@@ -213,6 +213,9 @@ def api_overview():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
+CONSIDERATIONS_CACHE = {"timestamp": 0, "data": []}
+
+
 @app.route("/api/considerations", methods=["GET"])
 def api_considerations():
     """Scan announcements, fee debt, and upcoming exams to formulate reminder recommendations."""
@@ -220,9 +223,15 @@ def api_considerations():
     if not client.is_authenticated():
         return jsonify({"success": False, "message": "Chưa đăng nhập."}), 401
 
+    import time
+    force = request.args.get("force", "0") in ("1", "true", "True")
+    if not force and CONSIDERATIONS_CACHE["data"] and (time.time() - CONSIDERATIONS_CACHE["timestamp"] < 300):
+        return jsonify({"success": True, "count": len(CONSIDERATIONS_CACHE["data"]), "items": CONSIDERATIONS_CACHE["data"]})
+
     try:
         from datetime import datetime, timedelta
         from src.notice_analyzer import ConsiderationItem, decrypt_hcmute_body
+        from concurrent.futures import ThreadPoolExecutor
 
         analyzer = NoticeAnalyzer(load_config())
         now = datetime.now()
@@ -282,20 +291,25 @@ def api_considerations():
         except Exception:
             pass
 
-        # 2. Personal notices (decrypt full bodies of recent notices)
+        # 2. Personal notices (concurrently fetch details in parallel)
         try:
-            personal_notices = client.get_personal_messages()
-            # Scan top 15 most recent personal notices
-            for p in personal_notices[:15]:
+            personal_notices = client.get_personal_messages()[:10]
+
+            def fetch_single_detail(p):
                 mid = p.get("MessageID") or p.get("Id")
-                if not mid:
-                    continue
-                try:
-                    p_detail = client.get_message_detail(mid)
-                    p["MessageBody"] = p_detail.get("MessageBody", "")
-                    p["SenderName"] = p_detail.get("SenderName", "")
-                except Exception:
-                    pass
+                if mid and "MessageBody" not in p:
+                    try:
+                        p_detail = client.get_message_detail(mid)
+                        p["MessageBody"] = p_detail.get("MessageBody", "")
+                        p["SenderName"] = p_detail.get("SenderName", "")
+                    except Exception:
+                        pass
+                return p
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                personal_notices = list(executor.map(fetch_single_detail, personal_notices))
+
+            for p in personal_notices:
                 item = analyzer.analyze_announcement(p, notice_type="personal")
                 if item:
                     all_items.append(item)
@@ -305,7 +319,7 @@ def api_considerations():
         # 3. General announcements
         try:
             general_notices = client.get_general_announcements()
-            for g in general_notices[:25]:
+            for g in general_notices[:20]:
                 item = analyzer.analyze_announcement(g, notice_type="general")
                 if item:
                     all_items.append(item)
@@ -357,6 +371,8 @@ def api_considerations():
                 "notice_type": it.notice_type,
             })
 
+        CONSIDERATIONS_CACHE["timestamp"] = time.time()
+        CONSIDERATIONS_CACHE["data"] = data
         return jsonify({"success": True, "count": len(data), "items": data})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
@@ -709,19 +725,44 @@ def load_feed_cache() -> list:
     return []
 
 
+@app.route("/calendar/<path:category_filename>", methods=["GET"])
 @app.route("/calendar/feed.ics", methods=["GET"])
-def calendar_feed():
+def calendar_feed(category_filename="feed.ics"):
     """
     Live webcal/iCal subscription feed.
     Automatically updates on Apple Calendar & Google Calendar in real time.
-    Supports query parameters: ?classes=1&exams=1&reminders=1
+    Supports clean URLs:
+      - /calendar/feed.ics (classes + exams)
+      - /calendar/all.ics (classes + exams + reminders)
+      - /calendar/tkb.ics (classes only)
+      - /calendar/thi.ics (exams only)
+      - /calendar/nhacnho.ics (reminders only)
+    Or query parameters: ?classes=1&exams=1&reminders=1
     """
     from datetime import datetime, timedelta
     now = datetime.now()
 
-    inc_classes = request.args.get("classes", "1") in ("1", "true", "True", "yes")
-    inc_exams = request.args.get("exams", "1") in ("1", "true", "True", "yes")
-    inc_reminders = request.args.get("reminders", "0") in ("1", "true", "True", "yes")
+    cat = (category_filename or "feed.ics").lower()
+    if cat in ("tkb.ics", "tkb"):
+        inc_classes = True
+        inc_exams = False
+        inc_reminders = False
+    elif cat in ("thi.ics", "thi", "lich_thi.ics"):
+        inc_classes = False
+        inc_exams = True
+        inc_reminders = False
+    elif cat in ("nhacnho.ics", "nhacnho", "reminders.ics"):
+        inc_classes = False
+        inc_exams = False
+        inc_reminders = True
+    elif cat in ("all.ics", "all"):
+        inc_classes = True
+        inc_exams = True
+        inc_reminders = True
+    else:
+        inc_classes = request.args.get("classes", "1") in ("1", "true", "True", "yes")
+        inc_exams = request.args.get("exams", "1") in ("1", "true", "True", "yes")
+        inc_reminders = request.args.get("reminders", "0") in ("1", "true", "True", "yes")
 
     client = get_client()
     fetched_fresh = False

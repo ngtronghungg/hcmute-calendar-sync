@@ -1509,7 +1509,7 @@
       list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Đang phân tích thông báo, kiểm tra hạn nộp học phí, SHCD...</div>`;
 
       try {
-        const res = await fetch('/api/considerations');
+        const res = await fetch('/api/considerations' + (force ? '?force=1' : ''));
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
 
@@ -1741,33 +1741,35 @@
       }
     }
 
-    function getLiveFeedParams() {
-      const incClasses = document.getElementById('syncOptClasses')?.checked ? '1' : '0';
-      const incExams = document.getElementById('syncOptExams')?.checked ? '1' : '0';
-      const incReminders = document.getElementById('syncOptReminders')?.checked ? '1' : '0';
-      return `classes=${incClasses}&exams=${incExams}&reminders=${incReminders}`;
-    }
-
     function getLiveFeedUrls() {
-      const params = getLiveFeedParams();
+      const incClasses = document.getElementById('syncOptClasses')?.checked ?? true;
+      const incExams = document.getElementById('syncOptExams')?.checked ?? true;
+      const incReminders = document.getElementById('syncOptReminders')?.checked ?? true;
+
+      let slug = 'feed.ics';
+      if (incClasses && !incExams && !incReminders) slug = 'tkb.ics';
+      else if (!incClasses && incExams && !incReminders) slug = 'thi.ics';
+      else if (!incClasses && !incExams && incReminders) slug = 'nhacnho.ics';
+      else if (incClasses && incExams && incReminders) slug = 'all.ics';
+
       const host = window.location.host;
       const protocol = window.location.protocol;
       
-      const httpFeedUrl = `${protocol}//${host}/calendar/feed.ics?${params}`;
-      const webcalUrl = `webcal://${host}/calendar/feed.ics?${params}`;
-      // Google Calendar direct 1-click subscription schema
-      const googleSubscribeUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(httpFeedUrl)}`;
+      const httpFeedUrl = `${protocol}//${host}/calendar/${slug}`;
+      const webcalUrl = `webcal://${host}/calendar/${slug}`;
+      // Google Calendar direct 1-click subscription schema:
+      // Google Calendar strictly requires webcal:// scheme with clean .ics URL
+      const googleSubscribeUrl = `https://calendar.google.com/calendar/render?cid=webcal://${host}/calendar/${slug}`;
       
-      return { httpFeedUrl, webcalUrl, googleSubscribeUrl };
+      return { httpFeedUrl, webcalUrl, googleSubscribeUrl, slug };
     }
 
     function updateFeedUrlDisplay() {
       try {
-        const { httpFeedUrl } = getLiveFeedUrls();
+        const { slug } = getLiveFeedUrls();
         const el = document.getElementById('currentFeedUrlDisplay');
         if (el) {
-          const urlObj = new URL(httpFeedUrl);
-          el.textContent = `Feed: ${urlObj.pathname}${urlObj.search}`;
+          el.textContent = `Feed: /calendar/${slug}`;
         }
       } catch {}
     }
