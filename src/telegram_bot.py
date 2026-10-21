@@ -333,6 +333,8 @@ def load_config() -> dict:
                     cfg["telegram"]["bot_username"] = secrets["bot_username"]
                 if secrets.get("admin_passcode"):
                     cfg["admin_passcode"] = secrets["admin_passcode"]
+                if secrets.get("gemini_api_key"):
+                    cfg["gemini_api_key"] = secrets["gemini_api_key"]
         except Exception:
             pass
 
@@ -350,6 +352,10 @@ def load_config() -> dict:
     if env_admin:
         cfg["admin_passcode"] = env_admin.strip()
 
+    env_gemini = os.environ.get("GEMINI_API_KEY")
+    if env_gemini:
+        cfg["gemini_api_key"] = env_gemini.strip()
+
     return cfg
 
 
@@ -363,6 +369,8 @@ def save_config(cfg: dict) -> bool:
             secrets["bot_username"] = cfg["telegram"]["bot_username"]
         if cfg.get("admin_passcode"):
             secrets["admin_passcode"] = cfg["admin_passcode"]
+        if cfg.get("gemini_api_key"):
+            secrets["gemini_api_key"] = cfg["gemini_api_key"]
 
         if secrets:
             secrets_path = os.path.join(PROJECT_ROOT, "data", ".secrets.json")
@@ -376,6 +384,8 @@ def save_config(cfg: dict) -> bool:
             clean_cfg["telegram"]["bot_token"] = ""
         if clean_cfg.get("admin_passcode"):
             clean_cfg["admin_passcode"] = ""
+        if clean_cfg.get("gemini_api_key"):
+            clean_cfg["gemini_api_key"] = ""
 
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -1557,8 +1567,32 @@ def process_telegram_update(upd: dict, bot_token: str, client: HCMUTEClient) -> 
         _handle_login_command(bot_token, chat_id, text, client, full_name, tg_username)
 
     else:
-        reply = (
-            f"👋 <b>Xin chào {full_name}!</b>\n\n"
-            "Trợ lý HCMUTE luôn sẵn sàng hỗ trợ bạn. Bạn có thể chọn nhanh tác vụ bên dưới:"
-        )
-        send_telegram_message(bot_token, chat_id, reply, reply_markup=MAIN_INLINE_KEYBOARD)
+        # Natural Vietnamese Conversational AI & Dynamic Intent Handler
+        try:
+            from src.conversational_ai import generate_conversational_reply
+            all_events = load_feed_cache()
+            cancelled_set = load_cancellations()
+            votes_db = load_cancellation_votes()
+            s_name, s_mssv = get_student_identity(chat_id, client)
+            cfg = load_config()
+            gemini_key = cfg.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY", "")
+
+            reply_text, custom_markup = generate_conversational_reply(
+                text=text,
+                chat_id=chat_id,
+                client=client,
+                student_name=s_name or full_name,
+                student_mssv=s_mssv,
+                all_events=all_events,
+                cancelled_set=cancelled_set,
+                votes_db=votes_db,
+                gemini_key=gemini_key,
+            )
+            send_telegram_message(bot_token, chat_id, reply_text, reply_markup=custom_markup or MAIN_INLINE_KEYBOARD)
+        except Exception as conv_err:
+            print(f"[Conversational AI Error] {conv_err}")
+            reply = (
+                f"👋 <b>Xin chào {full_name}!</b>\n\n"
+                "Trợ lý HCMUTE luôn sẵn sàng hỗ trợ bạn. Bạn có thể chọn nhanh tác vụ bên dưới hoặc hỏi tự nhiên <i>'mai học gì'</i>, <i>'thứ 5 học ở đâu'</i> nhé:"
+            )
+            send_telegram_message(bot_token, chat_id, reply, reply_markup=MAIN_INLINE_KEYBOARD)

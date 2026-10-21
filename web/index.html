@@ -1015,65 +1015,57 @@
     <!-- 1. LOGIN VIEW -->
     <div class="login-wrapper hidden" id="loginView">
       <div class="login-icon">🎓</div>
-      <h1 class="login-title">Đăng nhập HCMUTE</h1>
-      <p class="login-desc">Kết nối trực tiếp tới cổng đào tạo online.hcmute.edu.vn</p>
+      <h1 class="login-title">HCMUTE Sync</h1>
+      <p class="login-desc">Đồng bộ thời khóa biểu và lịch thi vào điện thoại</p>
 
       <div class="banner banner-error hidden" id="loginError"></div>
 
-      <!-- Login Tab Switcher: Password vs Token-Only -->
-      <div style="display: flex; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--surface-border); border-radius: var(--radius-full); padding: 3px; margin-bottom: 16px;">
-        <button type="button" id="tabLoginPass" class="tab-btn active" style="flex: 1; font-size: 12px; padding: 8px 12px; justify-content: center;" onclick="toggleLoginMode('pass')">
-          🔑 Đăng nhập MSSV
+      <!-- Segmented Mode Switcher -->
+      <div style="display: flex; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--surface-border); border-radius: var(--radius-full); padding: 3px; margin-bottom: 20px;">
+        <button type="button" id="tabLoginPass" class="tab-btn active" style="flex: 1; font-size: 13px; padding: 8px 14px; justify-content: center;" onclick="toggleLoginMode('pass')">
+          Tài khoản MSSV
         </button>
-        <button type="button" id="tabLoginToken" class="tab-btn" style="flex: 1; font-size: 12px; padding: 8px 12px; justify-content: center;" onclick="toggleLoginMode('token')">
-          🛡️ Dán Token (Không mật khẩu)
+        <button type="button" id="tabLoginToken" class="tab-btn" style="flex: 1; font-size: 13px; padding: 8px 14px; justify-content: center;" onclick="toggleLoginMode('token')">
+          Session Token
         </button>
       </div>
 
-      <div class="card">
+      <div class="card" style="box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);">
         <!-- Standard Form -->
         <form id="formLoginPass" onsubmit="handleLogin(event)">
           <div class="form-group">
-            <label class="form-label">Mã số sinh viên (MSSV)</label>
-            <input type="text" id="mssvInput" class="input-control" placeholder="VD: 24144177" required autocomplete="username">
+            <label class="form-label">Mã số sinh viên</label>
+            <input type="text" id="mssvInput" class="input-control" placeholder="24144177" required autocomplete="username">
           </div>
           <div class="form-group">
-            <label class="form-label">Mật khẩu</label>
+            <label class="form-label">Mật khẩu portal</label>
             <input type="password" id="passwordInput" class="input-control" placeholder="••••••••" required autocomplete="current-password">
           </div>
-          <button type="submit" class="btn-primary" id="loginSubmitBtn">
-            <span>Đăng nhập đồng bộ</span>
+          <button type="submit" class="btn-primary" id="loginSubmitBtn" style="width: 100%; margin-top: 8px;">
+            <span>Đăng nhập</span>
           </button>
-          <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 6px;">
-            <span>🔒</span>
-            <span>Mật khẩu tự hủy khỏi RAM ngay sau khi nhận Token. Không lưu trên đĩa.</span>
-          </div>
         </form>
 
-        <!-- Token-Only Form (Zero Password) -->
+        <!-- Token-Only Form -->
         <form id="formLoginToken" class="hidden" onsubmit="handleTokenLogin(event)">
           <div class="form-group">
-            <label class="form-label">Mã số sinh viên (MSSV - Tùy chọn)</label>
-            <input type="text" id="tokenMssvInput" class="input-control" placeholder="VD: 24144177">
+            <label class="form-label">MSSV (Tùy chọn)</label>
+            <input type="text" id="tokenMssvInput" class="input-control" placeholder="24144177">
           </div>
           <div class="form-group">
-            <label class="form-label">Cổng trường Session Token (F12 hoặc Session)</label>
-            <textarea id="tokenRawInput" class="input-control" rows="3" placeholder="Dán chuỗi Bearer Token (eyJhbGciOi...) tại đây" required style="font-family: var(--font-mono); font-size: 12px; line-height: 1.4; resize: vertical;"></textarea>
+            <label class="form-label">Bearer Token</label>
+            <textarea id="tokenRawInput" class="input-control" rows="3" placeholder="eyJhbGciOi..." required style="font-family: var(--font-mono); font-size: 12px; resize: none;"></textarea>
           </div>
-          <button type="submit" class="btn-primary" id="loginTokenSubmitBtn" style="background: var(--accent-emerald); color: #fff;">
-            <span>Xác nhận & Đồng bộ (Zero Password)</span>
+          <button type="submit" class="btn-primary" id="loginTokenSubmitBtn" style="width: 100%; margin-top: 8px;">
+            <span>Đồng bộ bằng Token</span>
           </button>
-          <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-            🌟 <strong>100% Không cần mật khẩu:</strong> Bạn đăng nhập Cổng trường trên máy của bạn, copy mã Token dán vào đây. Tool chỉ đọc TKB và lịch thi!
-          </div>
         </form>
       </div>
 
-      <!-- Link to Security Audit Modal -->
-      <div style="margin-top: 18px; text-align: center;">
-        <button type="button" onclick="openSecurityModal()" style="background: none; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px; padding: 6px 14px; color: var(--accent-blue); font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.1)'" onmouseout="this.style.background='none'">
-          <span>🛡️</span>
-          <span>Kiểm chứng Minh bạch: Tôi có lưu mật khẩu của bạn không? (Show, Don't Tell)</span>
+      <div style="margin-top: 20px; text-align: center;">
+        <button type="button" onclick="openSecurityModal()" style="background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-muted)'">
+          <span>🔒</span>
+          <span>Bảo mật 100% • Không lưu mật khẩu</span>
         </button>
       </div>
     </div>
@@ -1089,26 +1081,26 @@
       <section id="scheduleTab">
         <div class="dashboard-header">
           <div>
-            <h2 class="section-title">Thời khóa biểu Học kỳ</h2>
-            <p class="section-subtitle" id="semesterSubtitle">Đang đồng bộ dữ liệu TKB...</p>
+            <h2 class="section-title">Thời khóa biểu</h2>
+            <p class="section-subtitle" id="semesterSubtitle">Học kỳ hiện tại</p>
           </div>
           <div class="header-actions" style="flex-wrap: wrap;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(255,255,255,0.06); border: 1px solid var(--surface-border); padding: 6px 14px; border-radius: var(--radius-full); cursor: pointer; user-select: none;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--surface-border); padding: 6px 14px; border-radius: var(--radius-full); cursor: pointer; user-select: none;">
               <input type="checkbox" id="onlyUpcomingScheduleToggle" checked onchange="toggleSchedulePast(this.checked)" style="accent-color: var(--accent-red); width: 14px; height: 14px;">
-              <span id="scheduleToggleLabel">Chỉ hiện lịch sắp tới</span>
+              <span id="scheduleToggleLabel">Chỉ hiện sắp tới</span>
             </label>
             <select id="yearSelect" class="input-control" style="width: auto; padding: 6px 12px; font-size: 13px;" onchange="onSemesterChange()">
             </select>
             <select id="termSelect" class="input-control" style="width: auto; padding: 6px 12px; font-size: 13px;" onchange="onSemesterChange()">
             </select>
-            <button class="btn-secondary" onclick="promptAddMakeupClass()" style="color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.3);" title="Thêm buổi học bù vào lịch Google Calendar">
-              ➕ Báo học bù
+            <button class="btn-secondary" onclick="promptAddMakeupClass()" style="color: var(--accent-emerald);" title="Thêm lịch học bù">
+              ➕ Học bù
             </button>
-            <button class="btn-secondary" onclick="exportCategoryIcs('classes')" title="Tải riêng file TKB (.ics)">
-              ⬇️ Tải TKB (.ics)
+            <button class="btn-secondary" onclick="exportCategoryIcs('classes')" title="Tải file .ics">
+              ⬇️ Tải .ics
             </button>
             <button class="btn-secondary" onclick="loadOverviewData(true)">
-              🔄 Tải lại
+              🔄 Làm mới
             </button>
           </div>
         </div>
@@ -1123,11 +1115,11 @@
         <div class="dashboard-header">
           <div>
             <h2 class="section-title">Nhắc nhở & Hạn chót</h2>
-            <p class="section-subtitle">Đánh giá thông báo portal: Học phí, Sinh hoạt công dân đầu khóa, Khảo sát...</p>
+            <p class="section-subtitle">Học phí, sinh hoạt công dân và khảo sát</p>
           </div>
           <div class="header-actions">
             <button class="btn-secondary" onclick="loadConsiderations(true)">
-              🔍 Quét lại thông báo
+              🔄 Quét thông báo
             </button>
           </div>
         </div>
@@ -1142,10 +1134,10 @@
           </span>
           <div style="display: flex; gap: 10px;">
             <button class="btn-secondary" onclick="downloadSelectedIcs()">
-              📅 Tải file .ics
+              Tải file .ics
             </button>
             <button class="btn-primary" style="margin-top: 0; width: auto;" onclick="syncSelectedToGoogle()">
-              ⚡ Thêm vào Google Calendar
+              Thêm vào Google Calendar
             </button>
           </div>
         </div>
@@ -1155,17 +1147,17 @@
       <section id="examsTab" class="hidden">
         <div class="dashboard-header">
           <div>
-            <h2 class="section-title">Lịch thi Kết thúc học phần</h2>
-            <p class="section-subtitle" id="examsSubtitle">Phòng thi, giờ thi và thời gian làm bài chính thức</p>
+            <h2 class="section-title">Lịch thi</h2>
+            <p class="section-subtitle" id="examsSubtitle">Lịch thi kết thúc học phần</p>
           </div>
           <div class="header-actions">
-            <button class="btn-secondary" onclick="exportCategoryIcs('exams')" title="Tải riêng file Lịch thi (.ics)">
-              ⬇️ Tải Lịch thi (.ics)
-            </button>
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(255,255,255,0.06); border: 1px solid var(--surface-border); padding: 6px 14px; border-radius: var(--radius-full); cursor: pointer; user-select: none;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--surface-border); padding: 6px 14px; border-radius: var(--radius-full); cursor: pointer; user-select: none;">
               <input type="checkbox" id="onlyUpcomingExamsToggle" checked onchange="toggleExamsPast(this.checked)" style="accent-color: var(--accent-red); width: 14px; height: 14px;">
-              <span id="examsToggleLabel">Chỉ hiện môn sắp thi</span>
+              <span id="examsToggleLabel">Chỉ môn sắp thi</span>
             </label>
+            <button class="btn-secondary" onclick="exportCategoryIcs('exams')">
+              ⬇️ Tải .ics
+            </button>
           </div>
         </div>
         <div class="schedule-grid" id="examsGrid">
@@ -1177,102 +1169,46 @@
       <section id="telegramTab" class="hidden">
         <div class="dashboard-header">
           <div>
-            <h2 class="section-title">Trợ lý Telegram Tự động (Set & Forget)</h2>
-            <p class="section-subtitle">Chỉ thiết lập 1 lần đầu kỳ — Tự động thông báo suốt cả học kỳ mà không cần mở lại web</p>
+            <h2 class="section-title">Trợ lý Telegram</h2>
+            <p class="section-subtitle">Nhận lịch học 06:30 sáng, phòng học và cảnh báo lịch thi</p>
           </div>
         </div>
 
-        <!-- HERO CARD: DÀNH CHO SINH VIÊN (APPLE-STYLE SEAMLESS) -->
-        <div style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(99, 102, 241, 0.05) 100%); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 16px; padding: 28px 24px; margin-bottom: 24px;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); color: var(--accent-blue); padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 10px;">
-              <span>⚡ KÍCH HOẠT NHANH TRONG 2 GIÂY</span>
-            </div>
-            <h3 style="font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 6px;">
-              Nhận thông báo Lịch học, Lịch thi & Báo nghỉ qua Telegram
-            </h3>
-            <p style="font-size: 13px; color: var(--text-muted); max-width: 600px; margin: 0 auto; line-height: 1.5;">
-              Sinh viên hoàn toàn không cần gõ lệnh hay chat qua lại. Sau khi kết nối, bot sẽ tự động gửi bản tin sáng và báo động đỏ ngay khi giảng viên đổi lịch hoặc có lịch thi mới.
-            </p>
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: 18px; padding: 28px 24px; margin-bottom: 24px; text-align: center;">
+          <div style="width: 52px; height: 52px; border-radius: 16px; background: rgba(14, 165, 233, 0.12); color: var(--accent-blue); display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px;">
+            🤖
+          </div>
+          <h3 style="font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 6px;">
+            Kết nối Bot Telegram
+          </h3>
+          <p style="font-size: 13px; color: var(--text-muted); max-width: 480px; margin: 0 auto 20px; line-height: 1.5;">
+            Tự động gửi phòng học mỗi sáng, nhắc lịch thi cận kề và giải đáp TKB bằng tiếng Việt.
+          </p>
+
+          <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;">
+            <a id="tgDirectStartBtn" href="https://t.me/BotFather" target="_blank" class="btn-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 12px 24px; font-size: 14px; font-weight: 600;">
+              <span>💬 Mở Telegram & Bấm Start</span>
+            </a>
           </div>
 
-          <!-- 2 CÁCH KÍCH HOẠT -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; max-width: 780px; margin: 0 auto 24px;">
-            
-            <!-- CÁCH 1: 1-CHẠM (KHUYÊN DÙNG) -->
-            <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
-              <div>
-                <div style="font-size: 11px; font-weight: 700; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;">
-                  🚀 Khuyên dùng: Cách nhanh nhất
-                </div>
-                <div style="font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 6px;">
-                  Kích hoạt 1-Chạm trên Telegram
-                </div>
-                <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
-                  Bấm nút bên dưới để mở Telegram, sau đó chỉ cần nhấn <strong>START</strong> là hoàn tất kết nối tự động.
-                </p>
-              </div>
-              <a id="tgDirectStartBtn" href="https://t.me/BotFather" target="_blank" class="btn-primary" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; text-decoration: none; padding: 12px 18px; font-size: 14px; font-weight: 600; background: #0284c7; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35); border-radius: 8px;">
-                <span>💬 Mở Telegram & Bấm Start</span>
-              </a>
-            </div>
-
-            <!-- CÁCH 2: NHẬP SĐT HOẶC CHAT ID -->
-            <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
-              <div>
-                <div style="font-size: 11px; font-weight: 700; color: var(--accent-emerald); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;">
-                  ⚡ Tùy chọn: Nhập số trên Web
-                </div>
-                <div style="font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 6px;">
-                  Nhập Telegram Chat ID hoặc SĐT
-                </div>
-                <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
-                  Nhập ID hoặc SĐT của bạn, bot sẽ ngay lập tức gửi tin nhắn chào mừng và tự động liên kết.
-                </p>
-              </div>
-              <div>
-                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                  <input type="text" id="tgStudentChatId" class="input-control" placeholder="VD: 123456789 hoặc SĐT..." style="font-size: 13px;">
-                  <button class="btn-secondary" style="width: auto; padding: 0 16px; white-space: nowrap; font-size: 13px; font-weight: 600;" onclick="registerStudentChatId()">
-                    Kích hoạt
-                  </button>
-                </div>
-                <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between;">
-                  <span>Lấy Chat ID nhanh:</span>
-                  <a href="https://t.me/userinfobot" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">
-                    Mở @userinfobot (1 giây)
-                  </a>
-                </div>
-              </div>
-            </div>
-
+          <div style="max-width: 360px; margin: 0 auto 24px; display: flex; gap: 8px;">
+            <input type="text" id="tgStudentChatId" class="input-control" placeholder="Hoặc nhập Chat ID / SĐT..." style="font-size: 13px;">
+            <button class="btn-secondary" style="padding: 0 16px; white-space: nowrap; font-size: 13px;" onclick="registerStudentChatId()">
+              Kết nối
+            </button>
           </div>
 
-          <!-- 3 ĐẶC QUYỀN TỰ ĐỘNG CỦA SINH VIÊN (APPLE STYLE PILLS) -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; max-width: 860px; margin: 0 auto; text-align: left;">
-            <div style="padding: 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
-              <div style="font-size: 18px; margin-bottom: 4px;">☀️</div>
-              <div style="font-size: 13px; font-weight: 600; color: #fff;">Bản tin sáng 06:30</div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
-                Tự động gửi tóm tắt môn học, ca học và phòng học hôm nay thẳng vào điện thoại trước giờ đi học.
-              </div>
+          <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted);">
+            <div style="padding: 6px 14px; background: rgba(255, 255, 255, 0.04); border-radius: var(--radius-full); border: 1px solid var(--surface-border);">
+              ☀️ <b>06:30</b> Bản tin sáng
             </div>
-            <div style="padding: 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
-              <div style="font-size: 18px; margin-bottom: 4px;">🔥</div>
-              <div style="font-size: 13px; font-weight: 600; color: #fff;">Cảnh báo Lịch thi</div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
-                Báo động đỏ trước ngày thi và trước giờ thi 2 tiếng: số phòng thi, thời gian thi và số báo danh.
-              </div>
+            <div style="padding: 6px 14px; background: rgba(255, 255, 255, 0.04); border-radius: var(--radius-full); border: 1px solid var(--surface-border);">
+              🔥 <b>Cảnh báo</b> Lịch thi
             </div>
-            <div style="padding: 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
-              <div style="font-size: 18px; margin-bottom: 4px;">⚡</div>
-              <div style="font-size: 13px; font-weight: 600; color: #fff;">Báo nghỉ & Học bù tức thời</div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
-                Giảng viên đổi lịch hoặc báo nghỉ trên cổng, bot tự xóa trên Google Calendar và gửi cảnh báo khẩn.
-              </div>
+            <div style="padding: 6px 14px; background: rgba(255, 255, 255, 0.04); border-radius: var(--radius-full); border: 1px solid var(--surface-border);">
+              ❌ <b>Tự xóa</b> Khi báo nghỉ
             </div>
           </div>
-
         </div>
       </section>
 
@@ -1280,152 +1216,84 @@
       <section id="syncTab" class="hidden">
         <div class="dashboard-header">
           <div>
-            <h2 class="section-title">Đồng bộ Lịch Tự Động (Set & Forget)</h2>
-            <p class="section-subtitle">Chỉ bấm 1 lần duy nhất đầu kỳ — Tự động cập nhật vào điện thoại suốt học kỳ mỗi khi trường đổi lịch</p>
+            <h2 class="section-title">Đồng bộ Lịch</h2>
+            <p class="section-subtitle">Tự động cập nhật vào ứng dụng Lịch khi trường thay đổi thời khóa biểu</p>
           </div>
         </div>
 
-        <!-- HERO CARD: ĐỒNG BỘ 1 CHẠM TỰ ĐỘNG CẬP NHẬT -->
-        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(2, 132, 199, 0.06) 100%); border: 1.5px solid rgba(16, 185, 129, 0.35); border-radius: 18px; padding: 32px 24px; margin-bottom: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);">
-          
-          <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); padding: 5px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 14px; letter-spacing: 0.5px;">
-            <span>⚡ ĐỒNG BỘ TRỰC TIẾP 100% • TỰ ĐỘNG CẬP NHẬT SUỐT KỲ</span>
-          </div>
-
-          <h3 style="font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 8px;">
-            Đưa Thời Khóa Biểu & Lịch Thi vào Calendar của bạn
-          </h3>
-          <p style="font-size: 13px; color: var(--text-muted); max-width: 640px; margin: 0 auto 26px; line-height: 1.6;">
-            Bạn <strong>không cần tải file rồi tự upload thủ công</strong>. Chỉ cần bấm nút bên dưới 1 lần duy nhất: điện thoại sẽ tự động đăng ký kênh lịch. Bất cứ khi nào trường đổi phòng, dời lịch, báo nghỉ hay có lịch thi mới, lịch trong máy bạn sẽ <strong>tự động đồng bộ theo thời gian thực</strong>!
-          </p>
-
-          <!-- 2 NÚT 1 CHẠM CHO GOOGLE CALENDAR VÀ APPLE CALENDAR -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; max-width: 720px; margin: 0 auto 20px;">
-            
-            <!-- NÚT 1: GOOGLE CALENDAR -->
-            <button class="btn-primary" style="padding: 16px 20px; font-size: 15px; font-weight: 700; border-radius: 12px; background: #0284c7; box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35); display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; border: none; transition: transform 0.15s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'" onclick="syncOneClickLive('google')">
-              <span style="font-size: 20px;">📅</span>
-              <span>Thêm vào Google Calendar (1-Chạm)</span>
-            </button>
-
-            <!-- NÚT 2: APPLE / IPHONE CALENDAR -->
-            <button class="btn-primary" style="padding: 16px 20px; font-size: 15px; font-weight: 700; border-radius: 12px; background: #059669; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35); display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; border: none; transition: transform 0.15s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'" onclick="syncOneClickLive('apple')">
-              <span style="font-size: 20px;">🍏</span>
-              <span>Thêm vào Apple Calendar (iPhone/Mac)</span>
-            </button>
-
-          </div>
-
-          <!-- HƯỚNG DẪN ĐẶC BIỆT DÀNH CHO APPLE CALENDAR / IPHONE -->
-          <div style="margin: 0 auto 24px; padding: 18px 20px; background: rgba(59, 130, 246, 0.08); border: 1.5px solid rgba(59, 130, 246, 0.3); border-radius: 14px; max-width: 720px; text-align: left;">
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px;">
-              <span style="font-size: 18px;">🍏</span>
-              <span>Dành cho bạn dùng iPhone / iPad (Apple Calendar):</span>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-bottom: 24px;">
+          <!-- Card Apple Calendar -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: 18px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; text-align: left;">
+            <div>
+              <div style="font-size: 28px; margin-bottom: 12px;">🍏</div>
+              <div style="font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 4px;">Apple Calendar</div>
+              <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                Đăng ký trực tiếp vào iPhone, iPad, Apple Watch và Mac qua iCloud.
+              </p>
             </div>
-            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
-              <strong>❓ Tại sao đã thêm vào Google Calendar và đăng nhập vào iPhone rồi nhưng mở app Lịch (Apple Calendar) lại chưa thấy?</strong><br>
-              Theo mặc định của Apple & Google, khi thêm tài khoản Gmail vào iPhone, Apple Calendar <em>chỉ đồng bộ Lịch chính</em> và <strong>tự động ẩn các Lịch phụ (như HCMUTE)</strong> để tiết kiệm dữ liệu.
-            </p>
-
-            <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 12px 14px; font-size: 12px; line-height: 1.6; margin-bottom: 10px;">
-              <div style="font-weight: 600; color: #38bdf8; margin-bottom: 4px;">👉 Cách 1: Bật hiện Lịch phụ trong app Lịch iPhone (5 giây)</div>
-              1. Mở app <strong>Lịch (Apple Calendar)</strong> trên iPhone &rarr; Bấm vào chữ <strong>"Lịch" (Calendars)</strong> ở giữa góc dưới cùng.<br>
-              2. Kéo xuống mục tài khoản <strong>GMAIL</strong> &rarr; Bạn sẽ thấy dòng <strong>"HCMUTE - Thời Khóa Biểu"</strong>.<br>
-              3. Chạm vào ô tròn cạnh bên để <strong>BẬT DẤU TÍCH MÀU</strong> lên &rarr; Vuốt từ trên xuống để làm mới, lịch sẽ hiện ngay!<br>
-              <span style="color: var(--text-dim); font-size: 11px;">(Nếu chưa thấy dòng HCMUTE: Truy cập <a href="https://calendar.google.com/calendar/syncselect" target="_blank" style="color: #38bdf8; text-decoration: underline; font-weight: 600;">calendar.google.com/calendar/syncselect</a> trên Safari &rarr; Tích chọn ô HCMUTE &rarr; Bấm Lưu).</span>
-            </div>
-
-            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 12px 14px; font-size: 12px; line-height: 1.6;">
-              <div style="font-weight: 600; color: #34d399; margin-bottom: 4px;">🌟 Cách 2: Khuyên dùng cho iPhone (1-Chạm không lo bị Google ẩn)</div>
-              Bấm ngay nút màu xanh lá <strong>"🍏 Thêm vào Apple Calendar (iPhone/Mac)"</strong> ở trên &rarr; Safari tự động mở xác nhận &rarr; Bấm <strong>Đăng ký (Subscribe)</strong> là xong! Lịch sẽ lưu thẳng trên iCloud, hiện cả ở màn hình khóa và Apple Watch suốt học kỳ.
-            </div>
-          </div>
-
-          <!-- MẸO MÀU SẮC CHO GOOGLE CALENDAR (TÁCH KÊNH ĐỎ) -->
-          <div style="margin: 0 auto 24px; padding: 14px 18px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; max-width: 720px; text-align: left;">
-            <div style="font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <span>🎨</span> <span>Phân biệt màu sắc trên Google Calendar:</span>
-            </div>
-            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;">
-              Vì máy chủ Google Calendar mặc định phủ 1 màu cho toàn bộ 1 kênh lịch. Để bạn dễ nhìn nhất:
-              <br>• Mỗi môn học đã được gắn huy hiệu màu sắc riêng (<strong>🔵, 🟢, 🟡, 🟣, 🟠</strong>) và ngọn lửa <strong>🔥</strong> cho Lịch thi.
-              <br>• Nếu muốn <strong>khối Lịch thi có màu nền ĐỎ rực rỡ riêng</strong>, bạn chỉ cần bấm thêm riêng 2 kênh:
-            </p>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="syncOneClickLive('google', 'thi.ics')">
-                🔥 Thêm riêng Kênh Lịch Thi (Đỏ)
-              </button>
-              <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px; border-color: rgba(2, 132, 199, 0.4); color: var(--accent-blue);" onclick="syncOneClickLive('google', 'tkb.ics')">
-                📅 Thêm riêng Kênh Thời Khóa Biểu
-              </button>
-            </div>
-          </div>
-
-          <!-- 4 ĐIỂM ƯU VIỆT CỦA CƠ CHẾ LIVE SYNC -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; max-width: 860px; margin: 0 auto; text-align: left;">
-            <div style="padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
-              <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px;">🔄 Tự Động Cập Nhật 24/7</div>
-              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                Cổng trường đổi lịch học, báo nghỉ hay cập nhật lịch thi, điện thoại tự nhảy theo.
-              </div>
-            </div>
-            <div style="padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
-              <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px;">🎨 Phân Màu Thông Minh</div>
-              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                Mỗi môn học 1 màu riêng biệt, Lịch thi luôn mang màu Đỏ cà chua rực rỡ kèm nhãn 🔥.
-              </div>
-            </div>
-            <div style="padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
-              <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px;">⚡ Không Tốn Pin / RAM</div>
-              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                Dùng chuẩn Webcal native, chỉ đồng bộ ngầm khi cần, hoàn toàn không hao pin điện thoại.
-              </div>
-            </div>
-            <div style="padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
-              <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px;">📱 Hỗ Trợ Mọi Thiết Bị</div>
-              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                Tương thích mượt mà với iPhone, iPad, Android, Samsung, Windows Calendar và MacBook.
-              </div>
-            </div>
-          </div>
-
-          <div style="margin-top: 20px; font-size: 11px; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 8px;">
-            <span>Hoặc sao chép link đăng ký thủ công nếu muốn:</span>
-            <button class="btn-secondary" style="font-size: 11px; padding: 3px 10px;" onclick="copyLiveFeedUrl()">
-              📋 Sao chép URL Lịch
+            <button class="btn-primary" style="width: 100%; padding: 12px 18px; font-size: 14px; font-weight: 600;" onclick="syncOneClickLive('apple')">
+              <span>Đăng ký Apple Calendar</span>
             </button>
           </div>
 
+          <!-- Card Google Calendar -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--surface-border); border-radius: 18px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; text-align: left;">
+            <div>
+              <div style="font-size: 28px; margin-bottom: 12px;">📅</div>
+              <div style="font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 4px;">Google Calendar</div>
+              <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                Đồng bộ vào tài khoản Google, hiển thị trên Android và mọi thiết bị.
+              </p>
+            </div>
+            <button class="btn-secondary" style="width: 100%; padding: 12px 18px; font-size: 14px; font-weight: 600; border-color: rgba(255,255,255,0.15);" onclick="syncOneClickLive('google')">
+              <span>Thêm vào Google Calendar</span>
+            </button>
+          </div>
         </div>
 
-        <!-- TÙY CHỌN PHỤ: DÀNH CHO AI MUỐN TẢI FILE OFFLINE (THU GỌN LẠI HOÀN TOÀN) -->
-        <details style="font-size: 12px; color: var(--text-muted); border: 1px solid var(--surface-border); border-radius: 12px; padding: 14px 18px; background: rgba(255, 255, 255, 0.01);">
-          <summary style="cursor: pointer; font-weight: 600; color: var(--text-subtle);">
-            ⚙️ Tùy chọn nâng cao: Tải file .ics thủ công (Dành cho máy không kết nối internet)
+        <!-- Apple Calendar iOS Troubleshooting Collapsible -->
+        <details style="font-size: 12px; color: var(--text-muted); border: 1px solid var(--surface-border); border-radius: 14px; padding: 14px 18px; background: rgba(255, 255, 255, 0.02); margin-bottom: 16px;">
+          <summary style="cursor: pointer; font-weight: 500; color: var(--text-subtle); display: flex; align-items: center; justify-content: space-between;">
+            <span>🍏 Hướng dẫn nếu không thấy lịch trên iPhone</span>
+            <span style="font-size: 10px;">▼</span>
           </summary>
-          <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--surface-border);">
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-              Nếu bạn chỉ muốn xuất 1 file lịch tĩnh để xem offline mà không muốn tự động cập nhật:
-            </p>
-            <button class="btn-secondary" style="font-size: 12px; padding: 8px 16px;" onclick="downloadCustomIcs()">
-              📥 Tải file .ics về máy
-            </button>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--surface-border); line-height: 1.6;">
+            1. Mở app <strong>Lịch (Apple Calendar)</strong> trên iPhone &rarr; Chạm vào <strong>Lịch</strong> ở giữa mép dưới màn hình.<br>
+            2. Kéo xuống mục <strong>Gmail</strong> &rarr; Tìm <strong>HCMUTE - Thời Khóa Biểu</strong> &rarr; Bật dấu tích tròn màu.<br>
+            3. Hoặc bấm nút <strong>"Đăng ký Apple Calendar"</strong> ở trên để Safari đồng bộ trực tiếp qua iCloud (không bị Google ẩn).
           </div>
         </details>
 
+        <!-- Secondary Actions Row -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px;">
+          <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="copyLiveFeedUrl()">
+            📋 Sao chép URL Webcal
+          </button>
+          <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="downloadCustomIcs()">
+            📥 Tải file .ics offline
+          </button>
+        </div>
+
+        <!-- Hidden checkbox elements for JS sync logic compatibility -->
+        <div style="display: none;">
+          <input type="checkbox" id="syncOptClasses" checked>
+          <input type="checkbox" id="syncOptExams" checked>
+          <input type="checkbox" id="syncOptReminders">
+          <div id="tgConfigFields"></div>
+        </div>
       </section>
 
     </div>
 
-    <!-- SUBTLE FOOTER -->
-    <footer style="margin-top: 48px; padding: 24px 0 16px; border-top: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-muted);">
-      <div>HCMUTE Calendar Sync — Cập nhật TKB, Lịch thi & Báo nghỉ tức thời</div>
-      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-        <button type="button" onclick="openSecurityModal()" style="background: none; border: none; color: var(--accent-blue); font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.85">
-          <span>🛡️</span> <span>Kiểm chứng Minh bạch & Bảo mật</span>
+    <!-- Clean Minimalist Footer -->
+    <footer style="margin-top: 48px; padding: 24px 0 16px; border-top: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-subtle);">
+      <div>HCMUTE Sync • Cổng đào tạo sinh viên</div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <button type="button" onclick="openSecurityModal()" style="background: none; border: none; color: var(--text-subtle); font-size: 12px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-subtle)'">
+          🔒 Bảo mật & Quyền riêng tư
         </button>
-        <a href="/admin" target="_blank" style="color: var(--text-muted); text-decoration: none; opacity: 0.6; display: inline-flex; align-items: center; gap: 5px; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
-          <span>🔒</span> <span>Trang Quản trị (Admin)</span>
+        <a href="/admin" target="_blank" style="color: var(--text-subtle); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-subtle)'">
+          Quản trị
         </a>
       </div>
     </footer>
@@ -1437,97 +1305,63 @@
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <h3 class="modal-title" id="modalNoticeTitle">Tiêu đề thông báo</h3>
-          <div class="modal-meta" id="modalNoticeMeta">Người gửi • Ngày tạo</div>
+          <h3 class="modal-title" id="modalNoticeTitle">Chi tiết thông báo</h3>
+          <div class="modal-meta" id="modalNoticeMeta">Thông báo portal</div>
         </div>
         <button class="btn-icon" onclick="closeNoticeModal()" title="Đóng">✕</button>
       </div>
       <div class="modal-body" id="modalNoticeBody">
-        Đang tải nội dung...
+        Đang tải...
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeNoticeModal()">Đóng cửa sổ</button>
+        <button class="btn-secondary" onclick="closeNoticeModal()">Đóng</button>
       </div>
     </div>
   </div>
 
-  <!-- Privacy & Transparency Audit Modal (Show Don't Tell) -->
+  <!-- Privacy & Security Modal -->
   <div class="modal-overlay" id="securityModal" onclick="closeSecurityModal(event)">
-    <div class="modal-card" style="max-width: 680px;" onclick="event.stopPropagation()">
+    <div class="modal-card" style="max-width: 520px;" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
-            <span>🛡️</span>
-            <span>Báo cáo Minh bạch & Quyền riêng tư (Show, Don't Tell)</span>
-          </h3>
-          <div class="modal-meta">Kiểm chứng độc lập và minh bạch dữ liệu hệ thống</div>
+          <h3 class="modal-title">Bảo mật & Quyền riêng tư</h3>
+          <div class="modal-meta">Kiến trúc Zero-Knowledge</div>
         </div>
         <button class="btn-icon" onclick="closeSecurityModal()" title="Đóng">✕</button>
       </div>
       
-      <div class="modal-body" style="padding: 20px; font-size: 13px; line-height: 1.6; max-height: 70vh; overflow-y: auto;">
-        
-        <!-- LIVE SERVER FACTS -->
-        <div style="background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 14px 18px; margin-bottom: 18px;">
-          <div style="font-weight: 700; color: #34d399; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-            <span>✅</span>
-            <span>KIỂM CHỨNG THỰC TẾ TRÊN MÁY CHỦ (LIVE SERVER FACTS)</span>
+      <div class="modal-body" style="padding: 20px; font-size: 13px; line-height: 1.6;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+          <div style="padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 10px;">
+            <div style="color: var(--text-muted); font-size: 11px;">Mật khẩu sinh viên</div>
+            <div style="color: #4ade80; font-weight: 600; margin-top: 2px;">Không lưu (0 byte)</div>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; font-size: 12px;">
-            <div style="padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-              <div style="color: var(--text-muted);">Mật khẩu (Password):</div>
-              <div style="color: #4ade80; font-weight: 700; font-family: var(--font-mono);">❌ KHÔNG LƯU (0 BYTE)</div>
-            </div>
-            <div style="padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-              <div style="color: var(--text-muted);">Cơ sở dữ liệu (Database):</div>
-              <div style="color: #4ade80; font-weight: 700; font-family: var(--font-mono);">KHÔNG CÓ (Stateless)</div>
-            </div>
-            <div style="padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-              <div style="color: var(--text-muted);">Số CCCD / CMND / SĐT:</div>
-              <div style="color: #4ade80; font-weight: 700; font-family: var(--font-mono);">❌ KHÔNG LƯU (0 BYTE)</div>
-            </div>
-            <div style="padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-              <div style="color: var(--text-muted);">Bảng điểm / Chi tiết học phí:</div>
-              <div style="color: #4ade80; font-weight: 700; font-family: var(--font-mono);">❌ KHÔNG LƯU (0 BYTE)</div>
-            </div>
+          <div style="padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 10px;">
+            <div style="color: var(--text-muted); font-size: 11px;">Cơ sở dữ liệu</div>
+            <div style="color: #4ade80; font-weight: 600; margin-top: 2px;">Không có (Stateless)</div>
+          </div>
+          <div style="padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 10px;">
+            <div style="color: var(--text-muted); font-size: 11px;">Dữ liệu cá nhân</div>
+            <div style="color: #4ade80; font-weight: 600; margin-top: 2px;">Không lưu trữ</div>
+          </div>
+          <div style="padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 10px;">
+            <div style="color: var(--text-muted); font-size: 11px;">Mã nguồn</div>
+            <div style="color: #4ade80; font-weight: 600; margin-top: 2px;">Công khai GitHub</div>
           </div>
         </div>
 
-        <!-- 3 CÁCH TỰ KIỂM CHỨNG BẰNG MẮT THẬT (SHOW DONT TELL) -->
-        <h4 style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 10px;">
-          🔍 3 Cách để bạn tự kiểm chứng thật 100% (Không cần tin lời nói):
-        </h4>
+        <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 16px; line-height: 1.5;">
+          Mật khẩu chỉ dùng để lấy mã phiên trực tiếp từ Cổng trường và tự hủy khỏi RAM ngay lập tức. Mọi kết nối đều mã hóa HTTPS trực tiếp.
+        </p>
 
-        <div style="margin-bottom: 12px; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 10px;">
-          <div style="font-weight: 600; color: #38bdf8; margin-bottom: 4px;">1. Bật F12 kiểm tra Network (Dành cho mọi sinh viên IT):</div>
-          Bấm <code>F12</code> &rarr; tab <strong>Network</strong> &rarr; Đăng nhập.<br>
-          Bạn sẽ thấy gói tin xác thực gửi trực tiếp tới <code>portalapi.hcmute.edu.vn</code> và nhận về Bearer Token. Không có bất kỳ máy chủ bên thứ ba nào nhận mật khẩu.
-        </div>
-
-        <div style="margin-bottom: 12px; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 10px;">
-          <div style="font-weight: 600; color: #38bdf8; margin-bottom: 4px;">2. Chế độ Đăng nhập Bằng Token (Tuyệt đối không nhập Mật khẩu):</div>
-          Nếu bạn vẫn lo ngại: Hãy bấm chuyển sang tab <strong>"Dán Token"</strong> ở màn hình đăng nhập. Bạn đăng nhập Cổng trường ở tab khác, copy chuỗi Token dán vào tool. Tool sẽ tạo lịch mà <em>hoàn toàn không hề biết mật khẩu của bạn là gì</em>!
-        </div>
-
-        <div style="margin-bottom: 12px; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 10px;">
-          <div style="font-weight: 600; color: #38bdf8; margin-bottom: 4px;">3. Xem Mã Nguồn Mở Công Khai trên GitHub:</div>
-          Toàn bộ code backend Python được công khai minh bạch. Hàm xử lý hủy biến mật khẩu (<code>del password</code>) ngay tức khắc trong RAM và không có bất kỳ dòng lệnh nào ghi mật khẩu vào file hay database.
-        </div>
-
-        <!-- DATA YOU CAN WIPE -->
-        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <div style="font-size: 12px; color: var(--text-muted);">
-            Quyền được lãng quên (GDPR Right to be Forgotten):
-          </div>
-          <button class="btn-secondary" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 12px; padding: 6px 14px;" onclick="wipeMyData()">
-            🗑️ Xóa sạch mọi dữ liệu của tôi ngay
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="btn-secondary" style="font-size: 12px;" onclick="wipeMyData()">
+            Xóa phiên của tôi
+          </button>
+          <button class="btn-primary" style="width: auto; font-size: 12px;" onclick="closeSecurityModal()">
+            Đóng
           </button>
         </div>
-
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeSecurityModal()">Đóng cửa sổ</button>
       </div>
     </div>
   </div>

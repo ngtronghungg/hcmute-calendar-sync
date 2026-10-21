@@ -248,14 +248,31 @@ def search_and_format_course(keyword: str, all_events: list, cancelled_set: set)
     return "\n".join(lines)
 
 
+def format_telegram_html(text: str) -> str:
+    """Sanitize and convert standard markdown to Telegram-supported HTML tags."""
+    if not text:
+        return ""
+    # Convert code blocks
+    text = re.sub(r"```([a-zA-Z0-9_]*)\n([\s\S]*?)```", r"<pre>\2</pre>", text)
+    # Convert inline code
+    text = re.sub(r"`([^`\n]+)`", r"<code>\1</code>", text)
+    # Convert bold
+    text = re.sub(r"\*\*([^\*\n]+)\*\*", r"<b>\1</b>", text)
+    # Convert italic
+    text = re.sub(r"\*([^\*\n]+)\*", r"<i>\1</i>", text)
+    # Remove unsupported HTML tags or clean up
+    return text.strip()
+
+
 def call_gemini_api(api_key: str, user_prompt: str, student_context: dict) -> Optional[str]:
     """
-    Call Google Gemini 1.5 Flash / 2.0 Flash API to generate natural, conversational Vietnamese responses.
+    Call Google Gemini 3.8 Flash API to generate natural, conversational Vietnamese responses.
     """
     if not api_key:
         return None
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+    # Priority models (fastest first)
+    models = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"]
     headers = {"Content-Type": "application/json"}
 
     system_instruction = (
@@ -264,7 +281,7 @@ def call_gemini_api(api_key: str, user_prompt: str, student_context: dict) -> Op
         "- Xưng 'mình', gọi người dùng là 'bạn' một cách gần gũi, lễ phép, ấm áp như một người bạn cùng trường UTE.\n"
         "- Nói tiếng Việt lưu loát, tự nhiên, hiểu văn hóa sinh viên UTE (các tòa nhà A1, A2, B, C, D, E, X; ký túc xá, thi cử, rớt môn, qua môn, học bổng).\n"
         "- Luôn ưu tiên thông tin chính xác từ dữ liệu thời khóa biểu & lịch thi được cung cấp bên dưới.\n"
-        "- Trả lời súc tích, dễ nhìn trên Telegram, sử dụng định dạng HTML chuẩn (dùng <b>, <i>, <code>). KHÔNG dùng markdown ** hay ## vì Telegram dùng HTML parse_mode."
+        "- Trả lời súc tích, dễ nhìn trên Telegram, sử dụng định dạng HTML chuẩn (dùng <b>, <i>, <code>)."
     )
 
     context_str = json.dumps(student_context, ensure_ascii=False, indent=2)
@@ -282,22 +299,26 @@ def call_gemini_api(api_key: str, user_prompt: str, student_context: dict) -> Op
             }
         ],
         "generationConfig": {
-            "temperature": 0.5,
+            "temperature": 0.6,
             "maxOutputTokens": 600,
         }
     }
 
-    try:
-        resp = requests.post(url, headers=headers, json=prompt_payload, timeout=7)
-        if resp.status_code == 200:
-            res_data = resp.json()
-            candidates = res_data.get("candidates", [])
-            if candidates:
-                text_out = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                if text_out:
-                    return text_out.strip()
-    except Exception as e:
-        print(f"[Gemini AI] API call error: {e}")
+    for model_name in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key.strip()}"
+        try:
+            resp = requests.post(url, headers=headers, json=prompt_payload, timeout=8)
+            if resp.status_code == 200:
+                res_data = resp.json()
+                candidates = res_data.get("candidates", [])
+                if candidates:
+                    text_out = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    if text_out:
+                        return format_telegram_html(text_out)
+        except Exception as e:
+            print(f"[Gemini AI] API call error ({model_name}): {e}")
+            continue
+
     return None
 
 

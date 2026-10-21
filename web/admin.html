@@ -5,51 +5,65 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0a0c10">
-  <title>HCMUTE Calendar — Trung tâm Quản trị (Admin Portal)</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#09090b">
+  <title>HCMUTE Calendar — Quản trị Hệ thống</title>
   <style>
     :root {
-      --bg-primary: #0a0c10;
-      --bg-surface: #12161f;
-      --bg-card: #181e2b;
-      --bg-card-hover: #1f2737;
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      --border-focus: #0284c7;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --text-dim: #64748b;
-      --accent-blue: #38bdf8;
-      --accent-cyan: #06b6d4;
+      --bg: #09090b;
+      --surface: rgba(22, 22, 26, 0.72);
+      --surface-hover: rgba(30, 30, 36, 0.85);
+      --surface-border: rgba(255, 255, 255, 0.08);
+      --surface-border-strong: rgba(255, 255, 255, 0.16);
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --text-subtle: #71717a;
+      --accent-red: #ff3b30;
+      --accent-blue: #0ea5e9;
       --accent-emerald: #10b981;
       --accent-amber: #f59e0b;
-      --accent-red: #ef4444;
-      --accent-purple: #a855f7;
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", sans-serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     }
 
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      -webkit-font-smoothing: antialiased;
     }
 
     body {
-      background-color: var(--bg-primary);
-      color: var(--text-main);
+      background-color: var(--bg);
+      color: var(--text);
       font-family: var(--font-sans);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      -webkit-font-smoothing: antialiased;
+      position: relative;
+      overflow-x: hidden;
+      line-height: 1.5;
     }
 
-    /* Banners */
+    /* Ambient Apple Glow */
+    body::before {
+      content: "";
+      position: fixed;
+      top: -20%;
+      left: 20%;
+      width: 60vw;
+      height: 60vh;
+      background: radial-gradient(circle, rgba(14, 165, 233, 0.07) 0%, rgba(0, 0, 0, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Notification Banners */
     .banner {
-      padding: 12px 20px;
+      padding: 12px 24px;
       font-size: 13px;
       font-weight: 500;
       display: flex;
@@ -57,25 +71,36 @@
       justify-content: space-between;
       position: sticky;
       top: 0;
-      z-index: 100;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 200;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     }
-    .banner.success { background: #065f46; color: #a7f3d0; border-bottom: 1px solid #10b981; }
-    .banner.error { background: #7f1d1d; color: #fecaca; border-bottom: 1px solid #ef4444; }
+    .banner.success {
+      background: rgba(16, 185, 129, 0.18);
+      color: #6ee7b7;
+      border-bottom: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .banner.error {
+      background: rgba(255, 59, 48, 0.18);
+      color: #fca5a5;
+      border-bottom: 1px solid rgba(255, 59, 48, 0.3);
+    }
     .banner.hidden { display: none; }
 
     /* Top Navigation */
     header {
-      background: rgba(18, 22, 31, 0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(9, 9, 11, 0.78);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border-bottom: 1px solid var(--surface-border);
       padding: 14px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 50;
     }
 
     .brand {
@@ -83,117 +108,135 @@
       align-items: center;
       gap: 12px;
     }
-    .brand-logo {
+    .glyph {
       width: 34px;
       height: 34px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #0284c7, #6366f1);
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #0ea5e9, #38bdf8);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      font-size: 16px;
       color: #fff;
-      box-shadow: 0 0 16px rgba(2, 132, 199, 0.4);
+      font-weight: 700;
+      font-size: 15px;
+      box-shadow: 0 0 16px rgba(14, 165, 233, 0.35);
     }
     .brand-title {
       font-size: 15px;
       font-weight: 700;
-      letter-spacing: -0.3px;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     .brand-badge {
       font-size: 10px;
       font-weight: 700;
-      text-transform: uppercase;
-      padding: 2px 8px;
-      background: rgba(239, 68, 68, 0.15);
-      color: #fca5a5;
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      border-radius: 12px;
       letter-spacing: 0.5px;
+      padding: 2px 7px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 59, 48, 0.15);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 59, 48, 0.25);
+    }
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-subtle);
     }
 
     .nav-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
-    /* Buttons */
+    /* Buttons - Apple Style */
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      padding: 8px 16px;
-      border-radius: 8px;
+      padding: 9px 16px;
+      border-radius: var(--radius-full);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       border: 1px solid transparent;
-      transition: all 0.18s ease;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       text-decoration: none;
+      font-family: inherit;
     }
     .btn-primary {
-      background: #0284c7;
+      background: #0ea5e9;
       color: #fff;
+      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.3);
     }
     .btn-primary:hover {
-      background: #0369a1;
+      background: #0284c7;
       transform: translateY(-1px);
     }
     .btn-secondary {
       background: rgba(255, 255, 255, 0.05);
-      color: var(--text-main);
-      border-color: var(--border-subtle);
+      color: var(--text);
+      border-color: var(--surface-border);
     }
     .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--surface-border-strong);
     }
     .btn-danger {
-      background: rgba(239, 68, 68, 0.15);
-      color: #fca5a5;
-      border-color: rgba(239, 68, 68, 0.3);
+      background: rgba(255, 59, 48, 0.12);
+      color: #ff6b6b;
+      border-color: rgba(255, 59, 48, 0.25);
     }
     .btn-danger:hover {
-      background: rgba(239, 68, 68, 0.25);
+      background: rgba(255, 59, 48, 0.22);
     }
     .btn-sm {
-      padding: 4px 10px;
-      font-size: 11px;
+      padding: 5px 12px;
+      font-size: 12px;
     }
 
     /* Main Container */
     main {
       flex: 1;
-      max-width: 1200px;
+      max-width: 1160px;
       width: 100%;
       margin: 0 auto;
-      padding: 28px 24px 60px;
+      padding: 32px 24px 60px;
+      position: relative;
+      z-index: 1;
     }
 
-    /* Cards */
+    /* Apple Glass Cards */
     .card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: 14px;
+      background: var(--surface);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
       padding: 24px;
       margin-bottom: 24px;
+      transition: border-color 0.2s ease;
+    }
+    .card:hover {
+      border-color: var(--surface-border-strong);
     }
     .card-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 18px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--surface-border);
       flex-wrap: wrap;
       gap: 12px;
     }
     .card-title {
       font-size: 16px;
       font-weight: 700;
-      color: #fff;
+      color: var(--text);
+      letter-spacing: -0.2px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -212,40 +255,41 @@
       margin-bottom: 24px;
     }
     .stat-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: 12px;
+      background: var(--surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-md);
       padding: 18px 20px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      transition: border-color 0.2s;
+      gap: 4px;
+      transition: all 0.2s ease;
     }
     .stat-card:hover {
-      border-color: rgba(255, 255, 255, 0.16);
+      border-color: var(--surface-border-strong);
+      transform: translateY(-1px);
     }
     .stat-label {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      color: var(--text-muted);
+      color: var(--text-subtle);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      letter-spacing: 0.6px;
     }
     .stat-value {
-      font-size: 26px;
+      font-size: 28px;
       font-weight: 700;
-      color: #fff;
+      color: var(--text);
       font-family: var(--font-mono);
+      letter-spacing: -0.5px;
     }
     .stat-desc {
       font-size: 11px;
-      color: var(--text-dim);
+      color: var(--text-muted);
     }
 
-    /* Form Controls */
+    /* Forms & Inputs */
     .form-group {
       margin-bottom: 16px;
     }
@@ -253,30 +297,32 @@
       display: block;
       font-size: 12px;
       font-weight: 600;
-      color: var(--text-main);
+      color: var(--text);
       margin-bottom: 6px;
     }
     .form-input {
       width: 100%;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-md);
+      padding: 11px 14px;
       font-size: 13px;
       color: #fff;
       font-family: inherit;
       outline: none;
-      transition: border-color 0.2s;
+      transition: all 0.2s ease;
     }
     .form-input:focus {
-      border-color: var(--border-focus);
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
     }
 
-    /* Table */
+    /* Tables */
     .table-container {
       overflow-x: auto;
-      border-radius: 10px;
-      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--surface-border);
+      background: rgba(0, 0, 0, 0.2);
     }
     table {
       width: 100%;
@@ -285,16 +331,17 @@
       text-align: left;
     }
     th {
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(255, 255, 255, 0.02);
       padding: 12px 16px;
       color: var(--text-muted);
       font-weight: 600;
       font-size: 12px;
-      border-bottom: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--surface-border);
     }
     td {
-      padding: 12px 16px;
+      padding: 13px 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      vertical-align: middle;
     }
     tr:last-child td {
       border-bottom: none;
@@ -307,22 +354,24 @@
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 6px;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: var(--radius-full);
       font-size: 11px;
       font-weight: 600;
     }
     .badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
     .badge-warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
     .badge-blue { background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
+    .badge-gray { background: rgba(255, 255, 255, 0.06); color: var(--text-muted); border: 1px solid var(--surface-border); }
 
-    /* Login Overlay Modal */
+    /* Login Gateway Modal */
     #authOverlay {
       position: fixed;
       inset: 0;
-      background: rgba(10, 12, 16, 0.95);
-      backdrop-filter: blur(16px);
+      background: rgba(9, 9, 11, 0.92);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -330,21 +379,33 @@
       padding: 20px;
     }
     .auth-box {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: 16px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border-strong);
+      border-radius: var(--radius-lg);
       padding: 36px 32px;
-      max-width: 420px;
+      max-width: 400px;
       width: 100%;
       text-align: center;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+    }
+    .auth-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-full);
+      background: rgba(14, 165, 233, 0.12);
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 22px;
     }
 
     .hidden {
       display: none !important;
     }
 
-    /* Mobile Responsive Optimizations for Admin (iOS & Android) */
+    /* Mobile Responsive Optimizations */
     @media (max-width: 768px) {
       header {
         padding: max(12px, env(safe-area-inset-top)) 16px 12px;
@@ -367,8 +428,8 @@
         gap: 10px;
       }
       .card {
-        padding: 16px;
-        border-radius: 12px;
+        padding: 18px 16px;
+        border-radius: var(--radius-md);
       }
       .card-header {
         flex-direction: column;
@@ -379,7 +440,7 @@
         width: 100%;
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 8px;
       }
       .card-header > div:last-child button {
         flex: 1 1 auto;
@@ -391,18 +452,17 @@
         min-width: 580px;
       }
       input, select, textarea {
-        font-size: 16px !important; /* Prevents iOS Safari auto-zoom */
+        font-size: 16px !important; /* Prevents iOS auto-zoom */
       }
       .auth-box {
         padding: 24px 20px;
-        margin: 10px;
       }
     }
   </style>
 </head>
 <body>
 
-  <!-- SUCCESS / ERROR NOTIFICATIONS -->
+  <!-- NOTIFICATIONS -->
   <div id="bannerSuccess" class="banner success hidden">
     <span id="bannerSuccessMsg">Thành công!</span>
     <button class="btn-sm btn-secondary" onclick="document.getElementById('bannerSuccess').classList.add('hidden')">✕</button>
@@ -415,23 +475,21 @@
   <!-- AUTHENTICATION GATEWAY -->
   <div id="authOverlay">
     <div class="auth-box">
-      <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(2, 132, 199, 0.15); color: var(--accent-blue); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px;">
-        🔒
-      </div>
-      <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">Quản trị Hệ thống</h2>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5;">
-        Khu vực bảo mật dành riêng cho người quản lý hệ thống Calendar & Bot Telegram.
+      <div class="auth-icon">🔒</div>
+      <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px;">Quản trị Hệ thống</h2>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 22px;">
+        Nhập mật khẩu quản trị để truy cập bảng điều khiển.
       </p>
       <form onsubmit="handleAuthSubmit(event)">
         <div class="form-group" style="text-align: left;">
-          <label class="form-label">Mật khẩu Quản trị (Admin Passcode):</label>
-          <input type="password" id="adminPassInput" class="form-input" placeholder="Nhập mật khẩu admin..." autofocus required style="padding: 12px 14px; font-size: 14px;">
+          <label class="form-label">Mật khẩu quản trị</label>
+          <input type="password" id="adminPassInput" class="form-input" placeholder="Nhập mật khẩu admin..." autofocus required>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px; margin-top: 8px;">
-          <span>Đăng nhập Bảng Quản trị</span> ➔
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 6px;">
+          <span>Mở khóa Quản trị</span> ➔
         </button>
       </form>
-      <div style="margin-top: 20px; font-size: 12px; color: var(--text-dim);">
+      <div style="margin-top: 20px; font-size: 12px;">
         <a href="/" style="color: var(--text-muted); text-decoration: none;">← Quay lại Trang Sinh viên</a>
       </div>
     </div>
@@ -443,21 +501,21 @@
     <!-- TOP NAVIGATION -->
     <header>
       <div class="brand">
-        <div class="brand-logo">⚡</div>
+        <div class="glyph">⚡</div>
         <div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="brand-title">HCMUTE Calendar Hub</div>
-            <span class="brand-badge">ADMIN</span>
+          <div class="brand-title">
+            <span>HCMUTE Admin</span>
+            <span class="brand-badge">QUẢN TRỊ</span>
           </div>
-          <div style="font-size: 11px; color: var(--text-dim);">Trung tâm Kiểm soát & Quản trị Tự động hóa</div>
+          <div class="brand-subtitle">Trung tâm Điều khiển & Tự động hóa</div>
         </div>
       </div>
       <div class="nav-actions">
-        <a href="/" class="btn btn-secondary" target="_blank">
-          <span>🏠 Trang Sinh viên</span>
+        <a href="/" class="btn btn-secondary btn-sm" target="_blank">
+          <span>Trang Sinh viên ↗</span>
         </a>
         <button class="btn btn-danger btn-sm" onclick="logoutAdmin()">
-          <span>🔒 Khóa Admin</span>
+          <span>Khóa</span>
         </button>
       </div>
     </header>
@@ -467,34 +525,26 @@
       <!-- STATS OVERVIEW -->
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-label">
-            <span>👥 Sinh viên đã truy cập</span>
-          </div>
+          <div class="stat-label">Sinh viên truy cập</div>
           <div class="stat-value" id="statStudentCount">0</div>
-          <div class="stat-desc">MSSV đã tương tác qua Web / Telegram</div>
+          <div class="stat-desc">MSSV đã tương tác qua Web hoặc Bot</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">
-            <span>🤖 Trạng thái Bot Telegram</span>
-          </div>
-          <div class="stat-value" style="font-size: 18px; display: flex; align-items: center; gap: 8px; margin-top: 6px;" id="statBotStatus">
+          <div class="stat-label">Trạng thái Telegram Bot</div>
+          <div class="stat-value" style="font-size: 16px; margin-top: 4px;" id="statBotStatus">
             <span class="badge badge-warning">Đang kiểm tra...</span>
           </div>
-          <div class="stat-desc" id="statBotUsername">@BotFather</div>
+          <div class="stat-desc" id="statBotUsername">@hcmute_calendar_bot</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">
-            <span>🗳️ Ngưỡng Báo nghỉ Zalo</span>
-          </div>
+          <div class="stat-label">Ngưỡng báo nghỉ</div>
           <div class="stat-value" id="statCrowdThreshold">80%</div>
-          <div class="stat-desc">Tự động xóa lịch TKB & cảnh báo lớp</div>
+          <div class="stat-desc">Tự động hủy lịch khi đủ vote lớp</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">
-            <span>➕ Lớp Học bù kích hoạt</span>
-          </div>
+          <div class="stat-label">Lớp học bù</div>
           <div class="stat-value" id="statMakeupCount">0</div>
-          <div class="stat-desc">Buổi bù được đồng bộ qua Google Calendar</div>
+          <div class="stat-desc">Buổi bù đồng bộ Google Calendar</div>
         </div>
       </div>
 
@@ -503,17 +553,17 @@
         <div class="card-header">
           <div>
             <h3 class="card-title">
-              <span>👥 Danh sách MSSV đã truy cập Hệ thống</span>
+              <span>👥 Nhật ký MSSV đã truy cập</span>
             </h3>
             <p class="card-subtitle">
-              Danh sách MSSV sinh viên đã truy cập qua Web Portal hoặc Telegram Bot.
+              Danh sách sinh viên đã truy cập qua Web Portal hoặc Telegram Bot
             </p>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn btn-secondary" style="border-color: rgba(234, 179, 8, 0.4); color: #fde047;" onclick="triggerTestMorningPush()">
-              <span>☀️ Gửi thử Bản tin sáng cho TẤT CẢ</span>
+            <button class="btn btn-secondary btn-sm" style="border-color: rgba(234, 179, 8, 0.4); color: #fde047;" onclick="triggerTestMorningPush()">
+              <span>☀️ Gửi thử Bản tin sáng</span>
             </button>
-            <button class="btn btn-secondary" onclick="loadAdminUsers()">
+            <button class="btn btn-secondary btn-sm" onclick="loadAdminUsers()">
               <span>🔄 Làm mới</span>
             </button>
           </div>
@@ -526,9 +576,9 @@
                 <th>MSSV</th>
                 <th>Họ và Tên</th>
                 <th>Kênh truy cập</th>
-                <th>Truy cập gần nhất (Giờ VN)</th>
-                <th style="text-align: center;">Lượt truy cập</th>
-                <th style="text-align: right;">Hành động</th>
+                <th>Thời gian gần nhất (Giờ VN)</th>
+                <th style="text-align: center;">Lượt</th>
+                <th style="text-align: right;">Thao tác</th>
               </tr>
             </thead>
             <tbody id="studentTableBody">
@@ -547,20 +597,20 @@
         <div class="card-header">
           <div>
             <h3 class="card-title">
-              <span>📢 Phát thông báo khẩn tới Toàn bộ Sinh viên (Broadcast)</span>
+              <span>📢 Phát thông báo khẩn (Broadcast)</span>
             </h3>
             <p class="card-subtitle">
-              Tin nhắn này sẽ ngay lập tức được gửi đến Telegram của tất cả sinh viên trong danh sách trên.
+              Tin nhắn gửi tức thì đến Telegram của toàn bộ sinh viên trong hệ thống
             </p>
           </div>
         </div>
         <div>
           <div class="form-group">
-            <textarea id="broadcastMsgInput" class="form-input" rows="3" placeholder="Nhập nội dung thông báo chung (VD: Thông báo nghỉ lễ 30/4 - 1/5, hoặc dời lịch thi sang tuần sau...)" style="resize: vertical;"></textarea>
+            <textarea id="broadcastMsgInput" class="form-input" rows="3" placeholder="Nhập nội dung thông báo chung (VD: Thông báo nghỉ lễ, dời lịch thi, thông báo học vụ)..." style="resize: vertical;"></textarea>
           </div>
           <div style="display: flex; justify-content: flex-end;">
             <button class="btn btn-primary" onclick="sendBroadcast()">
-              <span>🚀 Phát thông báo ngay</span>
+              <span>Phát thông báo ngay</span>
             </button>
           </div>
         </div>
@@ -571,36 +621,46 @@
         <div class="card-header">
           <div>
             <h3 class="card-title">
-              <span>⚙️ Cấu hình Bot Telegram Master & Webhook</span>
+              <span>⚙️ Cấu hình Telegram Bot & Gemini AI</span>
             </h3>
             <p class="card-subtitle">
-              Chỉ cần cấu hình 1 lần. Chế độ Webhook giúp server không chạy ngầm, tiết kiệm 100% tài nguyên RAM/CPU.
+              Thiết lập token Telegram và chìa khóa trí tuệ nhân tạo Gemini
             </p>
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px;">
           <div class="form-group">
-            <label class="form-label">Telegram Bot Token (Từ @BotFather):</label>
+            <label class="form-label">Telegram Bot Token (từ @BotFather)</label>
             <input type="text" id="cfgBotToken" class="form-input" placeholder="7123456789:AAH7xY...">
           </div>
           <div class="form-group">
-            <label class="form-label">Bot Username (Không có dấu @):</label>
-            <input type="text" id="cfgBotUsername" class="form-input" placeholder="HCMUTESyncBot">
+            <label class="form-label">Bot Username (không có dấu @)</label>
+            <input type="text" id="cfgBotUsername" class="form-input" placeholder="hcmute_calendar_bot">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label">
+            <span>Google Gemini AI API Key (Tùy chọn)</span>
+          </label>
+          <input type="password" id="cfgGeminiKey" class="form-input" placeholder="Nhập Gemini API Key (AIzaSy... hoặc AQ...)">
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">
+            Trí tuệ nhân tạo Gemini giúp Bot nói chuyện tự nhiên bằng tiếng Việt, phân tích lịch học và giải đáp thông minh.
           </div>
         </div>
 
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <button class="btn btn-primary" onclick="saveBotConfig()">
-            <span>💾 Lưu cấu hình Bot</span>
+            <span>💾 Lưu cấu hình</span>
           </button>
           <button class="btn btn-secondary" style="border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald);" onclick="activateWebhook()">
-            <span>⚡ Bật Webhook Telegram (Render HTTPS)</span>
+            <span>⚡ Bật Webhook (HTTPS Render)</span>
           </button>
         </div>
       </div>
 
-      <!-- SECTION 4: CROWDSOURCE AUTO-CONFIRM & MAKE-UP CLASSES -->
+      <!-- SECTION 4: CROWDSOURCE & MAKE-UP CLASSES -->
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
         
         <!-- CROWDSOURCE THRESHOLD -->
@@ -608,25 +668,22 @@
           <div class="card-header">
             <div>
               <h3 class="card-title">
-                <span>🗳️ Cơ chế Báo nghỉ Zalo Đám đông</span>
+                <span>🗳️ Tự động báo nghỉ (Crowdsource)</span>
               </h3>
               <p class="card-subtitle">
-                Tự động xóa lịch học & thông báo lớp khi có đủ % sinh viên báo nghỉ.
+                Tự động xóa lịch và cảnh báo lớp khi đạt đủ tỷ lệ sinh viên báo nghỉ
               </p>
             </div>
           </div>
-          <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
-            Khi thầy cô báo nghỉ qua Zalo, sinh viên gõ <code>/nghi</code> trên Bot. Khi tỷ lệ báo nghỉ đạt ngưỡng, hệ thống tự động xác nhận nghỉ toàn lớp.
-          </p>
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
             <label class="form-label" style="margin-bottom: 0;">Ngưỡng kích hoạt:</label>
             <input type="number" id="crowdThresholdInput" min="10" max="100" value="80" class="form-input" style="width: 80px; text-align: center; padding: 6px 10px;">
             <span style="font-weight: 600;">%</span>
             <button class="btn btn-secondary btn-sm" onclick="saveCrowdsourceThreshold()">
-              💾 Lưu
+              Lưu
             </button>
           </div>
-          <div id="crowdVotesContainer" style="font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+          <div id="crowdVotesContainer" style="font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--surface-border); padding-top: 12px;">
             Đang kiểm tra các ca học có lượt vote...
           </div>
         </div>
@@ -636,14 +693,14 @@
           <div class="card-header">
             <div>
               <h3 class="card-title">
-                <span>➕ Lịch Học bù Đã Kích Hoạt</span>
+                <span>➕ Lịch Học bù Kích hoạt</span>
               </h3>
               <p class="card-subtitle">
-                Các buổi học bù được đồng bộ trực tiếp vào Google Calendar.
+                Các buổi học bù được bổ sung vào lịch Google Calendar
               </p>
             </div>
             <button class="btn btn-secondary btn-sm" onclick="promptAddMakeup()">
-              ➕ Thêm buổi bù
+              + Thêm buổi bù
             </button>
           </div>
           <div id="makeupClassesList" style="font-size: 12px; color: var(--text-muted);">
@@ -684,7 +741,7 @@
         localStorage.setItem('hcmute_admin_key', input);
         revealDashboard();
       } else {
-        showBanner('Sai mật khẩu quản trị viên! Vui lòng thử lại.', 'error');
+        showBanner('Mật khẩu quản trị chưa chính xác. Vui lòng thử lại.', 'error');
       }
     }
 
@@ -726,7 +783,6 @@
       ]);
     }
 
-    // 1. Students List
     // 1. Students Access List
     async function loadAdminUsers() {
       const tbody = document.getElementById('studentTableBody');
@@ -749,7 +805,7 @@
           tbody.innerHTML = `
             <tr>
               <td colspan="6" style="text-align: center; padding: 28px; color: var(--text-muted);">
-                Chưa có sinh viên nào truy cập hệ thống. Khi sinh viên đăng nhập cổng trường hoặc nhắn tin với Bot Telegram, MSSV sẽ tự động xuất hiện ở đây.
+                Chưa có dữ liệu truy cập. Khi sinh viên đăng nhập hoặc nhắn tin với Bot Telegram, MSSV sẽ tự động xuất hiện tại đây.
               </td>
             </tr>
           `;
@@ -767,10 +823,10 @@
           // Badges for channels
           let channelBadges = '';
           if (channelStr.includes('Telegram')) {
-            channelBadges += `<span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); margin-right: 4px;">Telegram</span>`;
+            channelBadges += `<span class="badge badge-blue" style="margin-right: 4px;">Telegram</span>`;
           }
           if (channelStr.includes('Web')) {
-            channelBadges += `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">Web Portal</span>`;
+            channelBadges += `<span class="badge badge-success">Web Portal</span>`;
           }
           if (!channelBadges) {
             channelBadges = `<span class="badge badge-gray">${channelStr}</span>`;
@@ -779,7 +835,7 @@
           return `
             <tr>
               <td>
-                <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-blue); font-size: 14px; letter-spacing: 0.5px;">${mssvStr}</span>
+                <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-blue); font-size: 13px; letter-spacing: 0.5px;">${mssvStr}</span>
               </td>
               <td style="font-weight: 500;">${nameStr}</td>
               <td>${channelBadges}</td>
@@ -790,8 +846,8 @@
                 </span>
               </td>
               <td style="text-align: right; white-space: nowrap;">
-                <button class="btn btn-danger btn-sm" onclick="deleteStudentAccessRecord('${mssvStr}', '${chatIdVal}')" title="Xóa khỏi danh sách">
-                  🗑️ Xóa
+                <button class="btn btn-danger btn-sm" onclick="deleteStudentAccessRecord('${mssvStr}', '${chatIdVal}')" title="Xóa bản ghi">
+                  Xóa
                 </button>
               </td>
             </tr>
@@ -805,7 +861,7 @@
 
     // 2. Delete Student Access Record
     async function deleteStudentAccessRecord(mssv, chatId) {
-      if (!confirm(`Bạn có chắc muốn xóa bản ghi MSSV [${mssv}] khỏi danh sách truy cập?`)) return;
+      if (!confirm(`Xóa bản ghi MSSV [${mssv}] khỏi nhật ký truy cập?`)) return;
 
       try {
         const res = await fetch('/api/admin/student-access/delete', {
@@ -815,7 +871,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          showBanner(`Đã xóa MSSV [${mssv}] thành công!`, 'success');
+          showBanner(`Đã xóa MSSV [${mssv}] thành công`, 'success');
           await loadAdminUsers();
         } else {
           showBanner('Lỗi: ' + data.message, 'error');
@@ -827,8 +883,8 @@
 
     // 3. Test Push Briefing
     async function triggerTestMorningPush() {
-      if (!confirm('Gửi thử ngay Bản tin sáng hôm nay tới TẤT CẢ sinh viên đang kết nối bot?')) return;
-      showBanner('Đang gửi thử bản tin sáng...', 'success');
+      if (!confirm('Gửi thử Bản tin sáng hôm nay đến toàn bộ sinh viên đang kết nối bot?')) return;
+      showBanner('Đang phát bản tin sáng...', 'success');
       try {
         const res = await fetch('/api/telegram/test-push', {
           method: 'POST',
@@ -837,7 +893,7 @@
         const data = await res.json();
         if (data.success) {
           const r = data.result || {};
-          showBanner(`🎉 Đã gửi thành công Bản tin sáng tới ${r.sent}/${r.total} sinh viên!`, 'success');
+          showBanner(`Đã gửi thành công Bản tin sáng tới ${r.sent}/${r.total} sinh viên`, 'success');
         } else {
           showBanner('Lỗi gửi thử: ' + (data.message || 'Không thành công'), 'error');
         }
@@ -851,11 +907,11 @@
       const input = document.getElementById('broadcastMsgInput');
       const msg = input ? input.value.trim() : '';
       if (!msg) {
-        showBanner('Vui lòng nhập nội dung thông báo!', 'error');
+        showBanner('Vui lòng nhập nội dung thông báo', 'error');
         return;
       }
 
-      if (!confirm('Bạn có chắc chắn muốn gửi thông báo này tới TẤT CẢ sinh viên đã kết nối bot?')) return;
+      if (!confirm('Gửi thông báo này tới toàn bộ sinh viên đã kết nối bot?')) return;
 
       showBanner('Đang phát sóng thông báo...', 'success');
       try {
@@ -867,7 +923,7 @@
         const data = await res.json();
         if (data.success) {
           const r = data.result || {};
-          showBanner(`🎉 Đã phát thông báo thành công đến ${r.sent}/${r.total} sinh viên!`, 'success');
+          showBanner(`Đã phát thông báo thành công đến ${r.sent}/${r.total} sinh viên`, 'success');
           if (input) input.value = '';
         } else {
           showBanner('Lỗi: ' + data.message, 'error');
@@ -886,15 +942,18 @@
           const c = data.config;
           document.getElementById('cfgBotToken').value = c.bot_token || '';
           document.getElementById('cfgBotUsername').value = c.bot_username || '';
+          if (document.getElementById('cfgGeminiKey')) {
+            document.getElementById('cfgGeminiKey').value = c.gemini_api_key || '';
+          }
           
           const statusBadge = document.getElementById('statBotStatus');
           const statusUser = document.getElementById('statBotUsername');
           if (c.bot_token) {
-            statusBadge.innerHTML = `<span class="badge badge-success">● Đã Cấu hình</span>`;
-            statusUser.textContent = c.bot_username ? '@' + c.bot_username : 'Token hợp lệ';
+            statusBadge.innerHTML = `<span class="badge badge-success">● Đang hoạt động</span>`;
+            statusUser.textContent = c.bot_username ? '@' + c.bot_username : 'Đã kết nối';
           } else {
-            statusBadge.innerHTML = `<span class="badge badge-warning">Chưa cấu hình Token</span>`;
-            statusUser.textContent = 'Cần điền token @BotFather';
+            statusBadge.innerHTML = `<span class="badge badge-warning">Chưa cấu hình</span>`;
+            statusUser.textContent = 'Cần Token từ @BotFather';
           }
         }
       } catch (err) {}
@@ -903,16 +962,17 @@
     async function saveBotConfig() {
       const token = document.getElementById('cfgBotToken').value.trim();
       const username = document.getElementById('cfgBotUsername').value.trim().replace('@', '');
+      const geminiKey = document.getElementById('cfgGeminiKey') ? document.getElementById('cfgGeminiKey').value.trim() : '';
 
       try {
         const res = await fetch('/api/telegram/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminPasscode },
-          body: JSON.stringify({ bot_token: token, bot_username: username, enabled: true })
+          body: JSON.stringify({ bot_token: token, bot_username: username, gemini_api_key: geminiKey, enabled: true })
         });
         const data = await res.json();
         if (data.success) {
-          showBanner('✔ Đã lưu cấu hình Bot Telegram!', 'success');
+          showBanner('Đã lưu cấu hình Bot Telegram & Gemini AI', 'success');
           await loadBotConfig();
         } else {
           showBanner('Lỗi lưu: ' + data.message, 'error');
@@ -923,7 +983,7 @@
     }
 
     async function activateWebhook() {
-      showBanner('Đang kết nối Webhook với máy chủ Telegram...', 'success');
+      showBanner('Đang kết nối Webhook HTTPS Telegram...', 'success');
       try {
         const res = await fetch('/api/telegram/set-webhook', {
           method: 'POST',
@@ -962,9 +1022,9 @@
               <span class="badge badge-warning">${voters.length} lượt báo nghỉ</span>
             </div>
           `).join('');
-          container.innerHTML = `<div><strong>Hiện có ca học đang bình chọn:</strong>${items}</div>`;
+          container.innerHTML = `<div><strong>Các ca học đang bình chọn:</strong>${items}</div>`;
         } else {
-          container.innerHTML = `<span style="color: var(--text-dim);">Chưa có ca học nào bị sinh viên báo nghỉ.</span>`;
+          container.innerHTML = `<span style="color: var(--text-subtle);">Chưa có ca học nào được báo nghỉ.</span>`;
         }
       } catch (err) {}
     }
@@ -979,7 +1039,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          showBanner(`✔ Đã cập nhật ngưỡng báo nghỉ: ${val}%!`, 'success');
+          showBanner(`Đã cập nhật ngưỡng báo nghỉ: ${val}%`, 'success');
           document.getElementById('statCrowdThreshold').textContent = val + '%';
         } else {
           showBanner('Lỗi: ' + data.message, 'error');
@@ -1000,17 +1060,17 @@
         if (data.success && data.items) {
           if (statCount) statCount.textContent = data.items.length;
           if (data.items.length === 0) {
-            container.innerHTML = `<span style="color: var(--text-dim);">Chưa có buổi học bù nào được thêm thủ công.</span>`;
+            container.innerHTML = `<span style="color: var(--text-subtle);">Chưa có buổi học bù nào được thêm thủ công.</span>`;
             return;
           }
 
           container.innerHTML = data.items.map(m => `
-            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="padding: 10px 12px; background: rgba(0,0,0,0.25); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <div style="font-weight: 600; color: #fff;">${m.summary}</div>
-                <div style="font-size: 11px; color: var(--text-dim);">📅 ${m.start} — 📍 ${m.location || 'HCMUTE'}</div>
+                <div style="font-size: 11px; color: var(--text-subtle);">📅 ${m.start} — 📍 ${m.location || 'HCMUTE'}</div>
               </div>
-              <button class="btn btn-danger btn-sm" onclick="deleteMakeup('${m.uid}')">✕ Xóa</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteMakeup('${m.uid}')">Xóa</button>
             </div>
           `).join('');
         }
@@ -1020,13 +1080,13 @@
     }
 
     async function promptAddMakeup() {
-      const title = prompt("Nhập Tên môn học báo học bù:");
+      const title = prompt("Tên môn học bù:");
       if (!title) return;
-      const dateStr = prompt("Nhập Ngày học bù (dạng dd/mm/yyyy):", new Date().toLocaleDateString('vi-VN'));
+      const dateStr = prompt("Ngày học bù (dd/mm/yyyy):", new Date().toLocaleDateString('vi-VN'));
       if (!dateStr) return;
-      const timeStr = prompt("Nhập Giờ bắt đầu (VD: 07:30 hoặc 13:00):", "07:30");
+      const timeStr = prompt("Giờ bắt đầu (VD: 07:30 hoặc 13:00):", "07:30");
       if (!timeStr) return;
-      const location = prompt("Nhập Phòng học (VD: C501, A1-203):", "HCMUTE") || "HCMUTE";
+      const location = prompt("Phòng học (VD: C501, A1-203):", "HCMUTE") || "HCMUTE";
 
       try {
         const res = await fetch('/api/schedule/makeup', {
@@ -1036,7 +1096,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          showBanner(`✔ Đã thêm buổi học bù môn ${title}!`, 'success');
+          showBanner(`Đã thêm buổi học bù môn ${title}`, 'success');
           await loadMakeupClasses();
         } else {
           showBanner('Lỗi: ' + data.message, 'error');
@@ -1047,7 +1107,7 @@
     }
 
     async function deleteMakeup(uid) {
-      if (!confirm('Bạn có chắc muốn xóa ca học bù này?')) return;
+      if (!confirm('Xác nhận xóa ca học bù này?')) return;
       try {
         const res = await fetch('/api/schedule/makeup', {
           method: 'DELETE',
@@ -1056,7 +1116,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          showBanner('✔ Đã xóa ca học bù.', 'success');
+          showBanner('Đã xóa ca học bù', 'success');
           await loadMakeupClasses();
         }
       } catch (err) {

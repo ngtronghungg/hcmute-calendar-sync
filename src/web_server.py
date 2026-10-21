@@ -1159,11 +1159,17 @@ def api_telegram_config():
         cfg["telegram"]["morning_time"] = data.get("morning_time", "06:30").strip()
         cfg["telegram"]["diff_alert"] = bool(data.get("diff_alert", True))
         cfg["telegram"]["enabled"] = bool(data.get("enabled", True))
+        if "gemini_api_key" in data:
+            cfg["gemini_api_key"] = str(data.get("gemini_api_key", "")).strip()
 
         save_tg_config(cfg)
-        return jsonify({"success": True, "config": cfg["telegram"]})
+        ret_cfg = dict(cfg["telegram"])
+        ret_cfg["gemini_api_key"] = cfg.get("gemini_api_key", "")
+        return jsonify({"success": True, "config": ret_cfg})
 
-    return jsonify({"success": True, "config": cfg.get("telegram", {})})
+    ret_cfg = dict(cfg.get("telegram", {}))
+    ret_cfg["gemini_api_key"] = cfg.get("gemini_api_key", "")
+    return jsonify({"success": True, "config": ret_cfg})
 
 
 @app.route("/api/telegram/bot-info", methods=["GET"])
