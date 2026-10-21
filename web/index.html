@@ -1034,109 +1034,114 @@
       <section id="syncTab" class="hidden">
         <div class="dashboard-header">
           <div>
-            <h2 class="section-title">Đồng bộ & Xuất file lịch tùy chọn</h2>
-            <p class="section-subtitle">Tự do chọn riêng từng mục: Chỉ Lịch thi, Chỉ Thời khóa biểu hoặc Chỉ Nhắc nhở</p>
+            <h2 class="section-title">Đồng bộ Lịch Tự Động (Set & Forget)</h2>
+            <p class="section-subtitle">Chỉ bấm 1 lần duy nhất đầu kỳ — Tự động cập nhật vào điện thoại suốt học kỳ mỗi khi trường đổi lịch</p>
           </div>
         </div>
 
-        <!-- BƯỚC 1: CHỌN NỘI DUNG ĐỒNG BỘ -->
-        <div class="card" style="padding: 24px; margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
-            <h3 style="font-size: 16px; font-weight: 600;">1. Chọn nội dung bạn muốn đưa vào Lịch:</h3>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button class="btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="setSyncPreset('all')">Chọn tất cả</button>
-              <button class="btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="setSyncPreset('exams')">Chỉ Lịch thi</button>
-              <button class="btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="setSyncPreset('classes')">Chỉ TKB</button>
-              <button class="btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="setSyncPreset('reminders')">Chỉ Nhắc nhở</button>
-            </div>
+        <!-- HERO CARD: ĐỒNG BỘ 1 CHẠM TỰ ĐỘNG CẬP NHẬT -->
+        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(2, 132, 199, 0.06) 100%); border: 1.5px solid rgba(16, 185, 129, 0.35); border-radius: 18px; padding: 32px 24px; margin-bottom: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);">
+          
+          <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); padding: 5px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 14px; letter-spacing: 0.5px;">
+            <span>⚡ ĐỒNG BỘ TRỰC TIẾP 100% • TỰ ĐỘNG CẬP NHẬT SUỐT KỲ</span>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
-            <label style="display: flex; align-items: center; gap: 12px; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: var(--radius-md); cursor: pointer;">
-              <input type="checkbox" id="syncOptClasses" checked onchange="updateFeedUrlDisplay()" style="accent-color: var(--accent-emerald); width: 18px; height: 18px;">
-              <div>
-                <div style="font-weight: 600; font-size: 14px;">📅 Thời khóa biểu học tập</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Các buổi học sắp tới trên lớp</div>
-              </div>
-            </label>
+          <h3 style="font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 8px;">
+            Đưa Thời Khóa Biểu & Lịch Thi vào Calendar của bạn
+          </h3>
+          <p style="font-size: 13px; color: var(--text-muted); max-width: 640px; margin: 0 auto 26px; line-height: 1.6;">
+            Bạn <strong>không cần tải file rồi tự upload thủ công</strong>. Chỉ cần bấm nút bên dưới 1 lần duy nhất: điện thoại sẽ tự động đăng ký kênh lịch. Bất cứ khi nào trường đổi phòng, dời lịch, báo nghỉ hay có lịch thi mới, lịch trong máy bạn sẽ <strong>tự động đồng bộ theo thời gian thực</strong>!
+          </p>
 
-            <label style="display: flex; align-items: center; gap: 12px; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: var(--radius-md); cursor: pointer;">
-              <input type="checkbox" id="syncOptExams" checked onchange="updateFeedUrlDisplay()" style="accent-color: var(--accent-red); width: 18px; height: 18px;">
-              <div>
-                <div style="font-weight: 600; font-size: 14px; color: #fca5a5;">📝 Lịch thi kết thúc học phần</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Môn thi, phòng thi, giờ thi</div>
-              </div>
-            </label>
-
-            <label style="display: flex; align-items: center; gap: 12px; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: var(--radius-md); cursor: pointer;">
-              <input type="checkbox" id="syncOptReminders" checked onchange="updateFeedUrlDisplay()" style="accent-color: var(--accent-amber); width: 18px; height: 18px;">
-              <div>
-                <div style="font-weight: 600; font-size: 14px; color: #fcd34d;">📢 Nhắc nhở hạn chót & Portal</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Học phí, SHCD, nộp chứng chỉ...</div>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- BƯỚC 2: CHỌN HÌNH THỨC CẬP NHẬT -->
-        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">2. Chọn phương thức đồng bộ:</h3>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
-
-          <!-- PHƯƠNG ÁN 1: REALTIME TRỰC TIẾP (KHÔNG QUA WEBCAL, 1 GIÂY LÀ XONG, SIÊU NHẸ) -->
-          <div class="card" style="padding: 24px; border: 2px solid var(--accent-emerald); background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-              <span style="font-size: 26px;">⚡</span>
-              <span class="priority-pill" style="background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.4); font-size: 11px;">
-                KHUYÊN DÙNG • REALTIME 1S
-              </span>
-            </div>
-            <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px;">Cập nhật Tức Thời (Real-time 1 Giây)</h3>
-            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-bottom: 18px;">
-              <strong>Không qua Webcal!</strong> Cập nhật tức thì ngay khi bạn bấm, không phải chờ Google quét 12-24 tiếng.
-              <br>• <strong>Siêu nhẹ:</strong> Web server hoàn thành trong 0.02s rồi giải phóng RAM/CPU ngay (không drain phần cứng).
-              <br>• <strong>Đa nền tảng:</strong> Mở được trên iPhone, Android, MacBook, Windows Calendar.
-            </p>
-
-            <button class="btn-primary" style="padding: 12px 20px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: pointer;" onclick="downloadCustomIcs()">
-              <span>📥 Cập nhật ngay vào Calendar (1 Chạm)</span>
+          <!-- 2 NÚT 1 CHẠM CHO GOOGLE CALENDAR VÀ APPLE CALENDAR -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; max-width: 720px; margin: 0 auto 20px;">
+            
+            <!-- NÚT 1: GOOGLE CALENDAR -->
+            <button class="btn-primary" style="padding: 16px 20px; font-size: 15px; font-weight: 700; border-radius: 12px; background: #0284c7; box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35); display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; border: none; transition: transform 0.15s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'" onclick="syncOneClickLive('google')">
+              <span style="font-size: 20px;">📅</span>
+              <span>Thêm vào Google Calendar (1-Chạm)</span>
             </button>
 
-            <div style="margin-top: 14px; text-align: center;">
-              <a href="https://calendar.google.com/calendar/u/0/r/settings/export" target="_blank" style="font-size: 11px; color: var(--accent-blue); text-decoration: underline;">
-                🔗 Mở trang Nhập file của Google Calendar Web
-              </a>
+            <!-- NÚT 2: APPLE / IPHONE CALENDAR -->
+            <button class="btn-primary" style="padding: 16px 20px; font-size: 15px; font-weight: 700; border-radius: 12px; background: #059669; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35); display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; border: none; transition: transform 0.15s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'" onclick="syncOneClickLive('apple')">
+              <span style="font-size: 20px;">🍏</span>
+              <span>Thêm vào Apple Calendar (iPhone/Mac)</span>
+            </button>
+
+          </div>
+
+          <!-- MẸO MÀU SẮC CHO GOOGLE CALENDAR (TÁCH KÊNH ĐỎ) -->
+          <div style="margin: 0 auto 24px; padding: 14px 18px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; max-width: 720px; text-align: left;">
+            <div style="font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>🎨</span> <span>Phân biệt màu sắc trên Google Calendar:</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;">
+              Vì máy chủ Google Calendar mặc định phủ 1 màu cho toàn bộ 1 kênh lịch. Để bạn dễ nhìn nhất:
+              <br>• Mỗi môn học đã được gắn huy hiệu màu sắc riêng (<strong>🔵, 🟢, 🟡, 🟣, 🟠</strong>) và ngọn lửa <strong>🔥</strong> cho Lịch thi.
+              <br>• Nếu muốn <strong>khối Lịch thi có màu nền ĐỎ rực rỡ riêng</strong>, bạn chỉ cần bấm thêm riêng 2 kênh:
+            </p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="syncOneClickLive('google', 'thi.ics')">
+                🔥 Thêm riêng Kênh Lịch Thi (Đỏ)
+              </button>
+              <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px; border-color: rgba(2, 132, 199, 0.4); color: var(--accent-blue);" onclick="syncOneClickLive('google', 'tkb.ics')">
+                📅 Thêm riêng Kênh Thời Khóa Biểu
+              </button>
             </div>
           </div>
 
-          <!-- PHƯƠNG ÁN 2: ĐĂNG KÝ WEBCAL (DÀNH CHO AI MUỐN TỰ ĐỘNG CHẬM HOẶC DÙNG APPLE CALENDAR) -->
-          <div class="card" style="padding: 24px; border-color: rgba(255, 255, 255, 0.1);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-              <span style="font-size: 26px;">🔗</span>
-              <span class="priority-pill" style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.15); font-size: 11px;">
-                TỰ ĐỘNG NGẦM (CHẬM)
-              </span>
+          <!-- 4 ĐIỂM ƯU VIỆT CỦA CƠ CHẾ LIVE SYNC -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; max-width: 860px; margin: 0 auto; text-align: left;">
+            <div style="padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
+              <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px;">🔄 Tự Động Cập Nhật 24/7</div>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                Cổng trường đổi lịch học, báo nghỉ hay cập nhật lịch thi, điện thoại tự nhảy theo.
+              </div>
             </div>
-            <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px;">Đăng ký Link Lịch Tự Động (Webcal)</h3>
-            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-bottom: 18px;">
-              Cung cấp link lịch cố định.
-              <br>⚠️ <em>Lưu ý: Máy chủ Google Calendar chỉ quét Webcal 1-2 lần/ngày (12-24h). Riêng Apple Calendar trên iPhone cho phép bạn kéo xuống làm mới ngay.</em>
-            </p>
+            <div style="padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
+              <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px;">🎨 Phân Màu Thông Minh</div>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                Mỗi môn học 1 màu riêng biệt, Lịch thi luôn mang màu Đỏ cà chua rực rỡ kèm nhãn 🔥.
+              </div>
+            </div>
+            <div style="padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
+              <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px;">⚡ Không Tốn Pin / RAM</div>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                Dùng chuẩn Webcal native, chỉ đồng bộ ngầm khi cần, hoàn toàn không hao pin điện thoại.
+              </div>
+            </div>
+            <div style="padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
+              <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px;">📱 Hỗ Trợ Mọi Thiết Bị</div>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                Tương thích mượt mà với iPhone, iPad, Android, Samsung, Windows Calendar và MacBook.
+              </div>
+            </div>
+          </div>
 
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              <button class="btn-secondary" style="padding: 10px 14px; font-size: 12px; justify-content: center;" onclick="syncOneClickLive('google')">
-                📅 Thêm vào Google Calendar (Link Webcal)
-              </button>
-              <button class="btn-secondary" style="padding: 10px 14px; font-size: 12px; justify-content: center;" onclick="syncOneClickLive('apple')">
-                🍏 Thêm vào Apple / iPhone Calendar
-              </button>
-              <button class="btn-secondary" style="padding: 6px 12px; font-size: 11px; justify-content: center; opacity: 0.8;" onclick="copyLiveFeedUrl()">
-                📋 Sao chép link URL lịch
-              </button>
-            </div>
+          <div style="margin-top: 20px; font-size: 11px; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>Hoặc sao chép link đăng ký thủ công nếu muốn:</span>
+            <button class="btn-secondary" style="font-size: 11px; padding: 3px 10px;" onclick="copyLiveFeedUrl()">
+              📋 Sao chép URL Lịch
+            </button>
           </div>
 
         </div>
+
+        <!-- TÙY CHỌN PHỤ: DÀNH CHO AI MUỐN TẢI FILE OFFLINE (THU GỌN LẠI HOÀN TOÀN) -->
+        <details style="font-size: 12px; color: var(--text-muted); border: 1px solid var(--surface-border); border-radius: 12px; padding: 14px 18px; background: rgba(255, 255, 255, 0.01);">
+          <summary style="cursor: pointer; font-weight: 600; color: var(--text-subtle);">
+            ⚙️ Tùy chọn nâng cao: Tải file .ics thủ công (Dành cho máy không kết nối internet)
+          </summary>
+          <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--surface-border);">
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+              Nếu bạn chỉ muốn xuất 1 file lịch tĩnh để xem offline mà không muốn tự động cập nhật:
+            </p>
+            <button class="btn-secondary" style="font-size: 12px; padding: 8px 16px;" onclick="downloadCustomIcs()">
+              📥 Tải file .ics về máy
+            </button>
+          </div>
+        </details>
+
       </section>
 
     </div>
@@ -1300,8 +1305,6 @@
       }
       if (tabName === 'sync') {
         document.getElementById('syncTab').classList.remove('hidden');
-        checkEnvironmentStatus();
-        updateFeedUrlDisplay();
       }
     }
 
@@ -1658,32 +1661,6 @@
         `Đã chọn ${count} trên tổng số ${appState.considerations.length} nhắc nhở`;
     }
 
-    function setSyncPreset(preset) {
-      const chkClasses = document.getElementById('syncOptClasses');
-      const chkExams = document.getElementById('syncOptExams');
-      const chkReminders = document.getElementById('syncOptReminders');
-      if (!chkClasses || !chkExams || !chkReminders) return;
-
-      if (preset === 'all') {
-        chkClasses.checked = true;
-        chkExams.checked = true;
-        chkReminders.checked = true;
-      } else if (preset === 'exams') {
-        chkClasses.checked = false;
-        chkExams.checked = true;
-        chkReminders.checked = false;
-      } else if (preset === 'classes') {
-        chkClasses.checked = true;
-        chkExams.checked = false;
-        chkReminders.checked = false;
-      } else if (preset === 'reminders') {
-        chkClasses.checked = false;
-        chkExams.checked = false;
-        chkReminders.checked = true;
-      }
-      updateFeedUrlDisplay();
-    }
-
     async function exportCategoryIcs(category) {
       const payload = {
         only_upcoming: category !== 'exams',
@@ -1768,71 +1745,35 @@
     }
 
     function getLiveFeedUrls() {
-      const incClasses = document.getElementById('syncOptClasses')?.checked ?? true;
-      const incExams = document.getElementById('syncOptExams')?.checked ?? true;
-      const incReminders = document.getElementById('syncOptReminders')?.checked ?? true;
-
-      let slug = 'feed.ics';
-      if (incClasses && !incExams && !incReminders) slug = 'tkb.ics';
-      else if (!incClasses && incExams && !incReminders) slug = 'thi.ics';
-      else if (!incClasses && !incExams && incReminders) slug = 'nhacnho.ics';
-      else if (incClasses && incExams && incReminders) slug = 'all.ics';
-
+      const slug = 'feed.ics';
       const host = window.location.host;
       const protocol = window.location.protocol;
       
       const httpFeedUrl = `${protocol}//${host}/calendar/${slug}`;
       const webcalUrl = `webcal://${host}/calendar/${slug}`;
-      // Google Calendar direct 1-click subscription schema:
-      // Google Calendar strictly requires webcal:// scheme with clean .ics URL
       const googleSubscribeUrl = `https://calendar.google.com/calendar/render?cid=webcal://${host}/calendar/${slug}`;
       
       return { httpFeedUrl, webcalUrl, googleSubscribeUrl, slug };
     }
 
-    function updateFeedUrlDisplay() {
-      try {
-        const { slug } = getLiveFeedUrls();
-        const el = document.getElementById('currentFeedUrlDisplay');
-        if (el) {
-          el.textContent = `Feed: /calendar/${slug}`;
-        }
-      } catch {}
-    }
-
-    function checkEnvironmentStatus() {
+    function syncOneClickLive(target, customSlug = 'feed.ics') {
       const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const badgeEl = document.getElementById('envStatusBadge');
-      const boxEl = document.getElementById('localhostNoticeBox');
+      const host = window.location.host;
+      const protocol = window.location.protocol;
       
-      if (isLocal) {
-        if (badgeEl) {
-          badgeEl.innerHTML = `<span class="priority-pill" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3);">💻 Đang chạy Localhost</span>`;
-        }
-        if (boxEl) boxEl.classList.remove('hidden');
-      } else {
-        if (badgeEl) {
-          badgeEl.innerHTML = `<span class="priority-pill" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3);">🟢 Cloud HTTPS Sẵn sàng</span>`;
-        }
-        if (boxEl) boxEl.classList.add('hidden');
-      }
-    }
-
-    function syncOneClickLive(target) {
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const { httpFeedUrl, webcalUrl, googleSubscribeUrl } = getLiveFeedUrls();
+      const slug = customSlug || 'feed.ics';
+      const webcalUrl = `webcal://${host}/calendar/${slug}`;
+      const googleSubscribeUrl = `https://calendar.google.com/calendar/render?cid=webcal://${host}/calendar/${slug}`;
 
       if (target === 'google') {
         if (isLocal) {
-          showBanner('⚠️ Chú ý: Đang chạy trên localhost. Máy chủ Google Calendar cần link web công khai để tự động đồng bộ Live. Hãy đưa tool lên Render hoặc tải file .ics bên dưới!', 'error');
-          const box = document.getElementById('localhostNoticeBox');
-          if (box) box.classList.remove('hidden');
+          showBanner('⚠️ Tool đang chạy trên localhost. Khi đưa lên Render (Cloud HTTPS), Google Calendar sẽ tự động nhận diện và cập nhật live!', 'error');
         } else {
           showBanner('🚀 Đang mở Google Calendar... Bạn chỉ cần nhấn nút "Thêm lịch" trên màn hình là hoàn tất 100%!', 'success');
         }
         window.open(googleSubscribeUrl, '_blank');
       } else if (target === 'apple') {
-        showBanner('🍏 Đang kết nối tới Calendar... Nhấn "Đăng ký" trên thiết bị để hoàn tất!', 'success');
+        showBanner('🍏 Đang kết nối tới Calendar... Nhấn "Đăng ký" trên màn hình để hoàn tất!', 'success');
         window.location.href = webcalUrl;
       }
     }

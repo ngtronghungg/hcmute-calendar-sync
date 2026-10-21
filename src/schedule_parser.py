@@ -55,6 +55,19 @@ COURSE_COLOR_PALETTE = [
     ("8", "#616161"),  # Graphite (Xám chì)
 ]
 
+# Colored Circle Emoji Badges to visually color-code events in Google/Apple Calendar
+COURSE_COLOR_EMOJIS = [
+    "🔵",  # Peacock Blue
+    "🟢",  # Sage Green
+    "🟡",  # Banana Yellow
+    "🟣",  # Grape Purple
+    "🟠",  # Tangerine Orange
+    "🟤",  # Graphite/Brown
+    "🔷",  # Diamond Blue
+    "🌿",  # Basil Green
+    "🌸",  # Lavender Pink
+]
+
 
 def get_course_color(course_name: str) -> tuple[str, str]:
     """
@@ -80,36 +93,51 @@ def assign_course_colors(events: List["CalendarEvent"]) -> None:
     """
     Ensure each distinct course in the event list receives a unique, collision-free color from the palette,
     while exam events are guaranteed to receive Tomato Red (Color 11, #d50000).
+    Also attaches distinct colored circle emojis (🔵, 🟢, 🟡, 🟣, etc.) to event titles so they
+    render with distinct colors in Google Calendar and Apple Calendar feeds.
     """
     course_titles = []
     for ev in events:
         if (ev.event_type or "").upper() in ("CLASS", "TKB"):
-            clean_title = re.sub(r"\[.*?\]|\(.*?\)", "", ev.title).strip()
+            clean_title = re.sub(r"\[.*?\]|\(.*?\)", "", ev.title)
+            clean_title = re.sub(r"^[🔵🟢🟡🟣🟠🟤🔷🌿🌸⚡\s]+", "", clean_title).strip()
             if clean_title and clean_title not in course_titles:
                 course_titles.append(clean_title)
 
     color_map = {}
+    emoji_map = {}
     for idx, ct in enumerate(course_titles):
         color_map[ct] = COURSE_COLOR_PALETTE[idx % len(COURSE_COLOR_PALETTE)]
+        emoji_map[ct] = COURSE_COLOR_EMOJIS[idx % len(COURSE_COLOR_EMOJIS)]
 
     for ev in events:
         ev_type = (ev.event_type or "").upper()
         if ev_type == "EXAM":
             ev.color_id = "11"  # Tomato (Đỏ tươi nổi bật cảnh báo)
             ev.color_hex = "#d50000"
-            if "THI" not in ev.title.upper():
-                ev.title = f"🔥 [LỊCH THI] {ev.title}"
-            elif not ev.title.startswith("🔥"):
-                ev.title = f"🔥 {ev.title}"
+            clean_exam = re.sub(r"^(🔥|🔴|\[LỊCH THI\]|\s)+", "", ev.title).strip()
+            ev.title = f"🔥 [LỊCH THI] {clean_exam}"
         elif ev_type == "DEADLINE":
             ev.color_id = "4"   # Flamingo (Cam hồng)
             ev.color_hex = "#e67c73"
+            clean_d = re.sub(r"^(⏰|⚠️|\[NHẮC NHỞ\]|\s)+", "", ev.title).strip()
+            ev.title = f"⏰ {clean_d}"
         else:
-            clean_title = re.sub(r"\[.*?\]|\(.*?\)", "", ev.title).strip()
+            clean_title = re.sub(r"\[.*?\]|\(.*?\)", "", ev.title)
+            clean_title = re.sub(r"^[🔵🟢🟡🟣🟠🟤🔷🌿🌸⚡\s]+", "", clean_title).strip()
             if clean_title in color_map:
                 ev.color_id, ev.color_hex = color_map[clean_title]
+                emoji = emoji_map.get(clean_title, "🔵")
             else:
                 ev.color_id, ev.color_hex = get_course_color(ev.title)
+                emoji = COURSE_COLOR_EMOJIS[0]
+
+            raw_no_emoji = re.sub(r"^[🔵🟢🟡🟣🟠🟤🔷🌿🌸⚡\s]+", "", ev.title).strip()
+            if ev.title.startswith("⚡"):
+                ev.title = f"⚡ [HỌC BÙ] {raw_no_emoji}"
+            else:
+                ev.title = f"{emoji} {raw_no_emoji}"
+
 
 
 class CalendarEvent:
