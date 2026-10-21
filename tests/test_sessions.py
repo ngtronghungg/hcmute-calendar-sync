@@ -136,7 +136,7 @@ class TestMultiUserSessions(unittest.TestCase):
         self.assertEqual(events_a[0].title, "Giải tích 1")
 
         # Load for Student B
-        events_b = load_feed_cache(mssv="24144999")
+        events_b = load_feed_cache(mssv="20110002")
         self.assertEqual(len(events_b), 1)
         self.assertEqual(events_b[0].uid, "class_student_B_202")
         self.assertEqual(events_b[0].title, "Vật lý đại cương")
@@ -163,6 +163,16 @@ class TestMultiUserSessions(unittest.TestCase):
         # Verify Set-Cookie has deleted or expired hcmute_session
         cookie_header = res_logout.headers.get("Set-Cookie", "")
         self.assertIn("hcmute_session=", cookie_header)
+
+    def test_google_login_endpoint(self):
+        """Verify /api/login/google handles missing or invalid token appropriately."""
+        res_empty = self.client.post("/api/login/google", json={})
+        self.assertEqual(res_empty.status_code, 400)
+        self.assertFalse(res_empty.get_json()["success"])
+
+        res_invalid = self.client.post("/api/login/google", json={"credential": "invalid_dummy_token"})
+        self.assertEqual(res_invalid.status_code, 401)
+        self.assertFalse(res_invalid.get_json()["success"])
 
 
 if __name__ == "__main__":

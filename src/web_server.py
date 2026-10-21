@@ -374,6 +374,67 @@ def api_login():
         return jsonify({"success": False, "message": str(e)}), 400
 
 
+@app.route("/api/login/google", methods=["POST"])
+def api_login_google():
+    """
+    Authenticate student with Google OAuth credential (@student.hcmute.edu.vn).
+    Sends credential directly to portalapi.hcmute.edu.vn/api/authenticate/AuthenticateGoogle.
+    """
+    data = request.json or {}
+    google_token = data.get("credential") or data.get("token") or ""
+    if not google_token:
+        return jsonify({"success": False, "message": "Không tìm thấy mã xác thực Google."}), 400
+
+    cfg = load_config()
+    hcmute_cfg = cfg.get("hcmute", {})
+    client = HCMUTEClient(
+        base_url=hcmute_cfg.get("base_url", "https://portalapi.hcmute.edu.vn/api/"),
+        api_key=hcmute_cfg.get("api_key", "utepscRBF0zT2Mqo6vMw69YMOH43IrB2RtXBS0EHit2kzvL2auxaFJBvw=="),
+        client_id=hcmute_cfg.get("client_id", "ute"),
+        token_cache_file=None,
+    )
+
+    try:
+        profile = client.login_with_google(google_token)
+        session_token = secrets.token_urlsafe(32)
+        mssv = str(profile.get("Id", "")).strip()
+        name = profile.get("FullName") or profile.get("Username", "Sinh viên")
+        role = profile.get("Role", "SV")
+        status = profile.get("StudyStatusName", "Đang học (Google Auth)")
+        expire = profile.get("Expire")
+
+        session_rec = {
+            "session_token": session_token,
+            "mssv": mssv,
+            "name": name,
+            "role": role,
+            "status": status,
+            "portal_token": client.token,
+            "expire": expire,
+            "session_data": profile,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_active": datetime.now(timezone.utc).isoformat(),
+        }
+        ACTIVE_SESSIONS[session_token] = session_rec
+        save_sessions()
+
+        record_student_access(mssv=mssv, name=name, channel="Web Portal (Google)")
+        resp = jsonify({
+            "success": True,
+            "session_token": session_token,
+            "profile": {
+                "id": mssv,
+                "name": name,
+                "role": role,
+                "status": status,
+            }
+        })
+        resp.set_cookie("hcmute_session", session_token, max_age=86400 * 7, httponly=False, samesite="Lax")
+        return resp
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Đăng nhập Google thất bại: {e}"}), 401
+
+
 @app.route("/api/logout", methods=["POST"])
 def api_logout():
     """Handle student logout by revoking their browser session."""
@@ -590,7 +651,7 @@ def api_overview():
             d["is_cancelled"] = c.uid in cancelled_set
             classes_data.append(d)
 
-        exams_to_return = deduped_exams if (include_past or include_past_exams) else upcoming_exams
+        exams_to_return = deduped_exams if include_past_exams else upcoming_exams
         exams_to_return.sort(key=lambda x: x.start_datetime)
 
         return jsonify({

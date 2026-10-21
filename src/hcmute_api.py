@@ -149,6 +149,35 @@ class HCMUTEClient:
         self.save_session(data)
         return data
 
+    def login_with_google(self, google_token: str) -> Dict[str, Any]:
+        """
+        Authenticate using Google OAuth ID token (credential) for @student.hcmute.edu.vn.
+        Endpoint: POST /api/authenticate/AuthenticateGoogle
+        """
+        url = self.base_url + "authenticate/AuthenticateGoogle"
+        payload = {"Token": google_token.strip()}
+
+        resp = requests.post(
+            url,
+            headers=self._headers(authenticated=False),
+            json=payload,
+            timeout=15,
+        )
+
+        if resp.status_code != 200:
+            try:
+                err = resp.json().get("message", resp.text)
+            except Exception:
+                err = resp.text
+            raise ConnectionError(f"Đăng nhập Google thất bại: {err}")
+
+        data = resp.json()
+        if not data or "Token" not in data:
+            raise ValueError(f"Dữ liệu phản hồi đăng nhập Google không hợp lệ: {data}")
+
+        self.save_session(data)
+        return data
+
     def is_authenticated(self) -> bool:
         return bool(self.token)
 

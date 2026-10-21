@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#09090b">
   <title>UTECal - HCMUTE Calendar & Sync</title>
+  <!-- Google Sign-In Identity Services SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     :root {
       --bg: #09090b;
@@ -1412,10 +1414,13 @@
 
       <!-- Segmented Mode Switcher -->
       <div style="display: flex; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--surface-border); border-radius: var(--radius-full); padding: 3px; margin-bottom: 20px;">
-        <button type="button" id="tabLoginPass" class="tab-btn active" style="flex: 1; font-size: 13px; padding: 8px 14px; justify-content: center;" onclick="toggleLoginMode('pass')">
+        <button type="button" id="tabLoginPass" class="tab-btn active" style="flex: 1; font-size: 12.5px; padding: 8px 10px; justify-content: center;" onclick="toggleLoginMode('pass')">
           Tài khoản MSSV
         </button>
-        <button type="button" id="tabLoginToken" class="tab-btn" style="flex: 1; font-size: 13px; padding: 8px 14px; justify-content: center;" onclick="toggleLoginMode('token')">
+        <button type="button" id="tabLoginGoogle" class="tab-btn" style="flex: 1; font-size: 12.5px; padding: 8px 10px; justify-content: center;" onclick="toggleLoginMode('google')">
+          Google UTE
+        </button>
+        <button type="button" id="tabLoginToken" class="tab-btn" style="flex: 1; font-size: 12.5px; padding: 8px 10px; justify-content: center;" onclick="toggleLoginMode('token')">
           Session Token
         </button>
       </div>
@@ -1435,6 +1440,36 @@
             <span>Đăng nhập</span>
           </button>
         </form>
+
+        <!-- Google Form -->
+        <div id="formLoginGoogle" class="hidden" style="text-align: center; padding: 8px 0;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.5;">
+            Đăng nhập bằng tài khoản Google trường cấp<br>
+            <span style="color: #38bdf8; font-weight: 600;">@student.hcmute.edu.vn</span>
+          </div>
+
+          <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+            <div id="g_id_onload"
+                 data-client_id="964854159694-3psqmro01jvt4uloj0dkrruvt4c4asso.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleLoginCallback"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="pill"
+                 data-theme="filled_black"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-logo_alignment="left">
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 11.5px; color: var(--text-subtle); line-height: 1.5;">
+            🔒 Xác thực trực tiếp qua Cổng đào tạo HCMUTE với Google Client ID chính thức của trường.
+          </div>
+        </div>
 
         <!-- Token-Only Form -->
         <form id="formLoginToken" class="hidden" onsubmit="handleTokenLogin(event)">
@@ -1640,14 +1675,17 @@
             Tự động gửi phòng học mỗi sáng, nhắc lịch thi cận kề và giải đáp TKB bằng tiếng Việt.
           </p>
 
-          <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;">
-            <a id="tgDirectStartBtn" href="https://t.me/BotFather" target="_blank" class="btn-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 12px 24px; font-size: 14px; font-weight: 600;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 24px;">
+            <a id="tgDirectStartBtn" href="https://t.me/hcmute_calendar_bot" target="_blank" class="btn-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 13px 26px; font-size: 14.5px; font-weight: 600; box-shadow: 0 4px 20px rgba(14, 165, 233, 0.35);">
               <span>💬 Mở Telegram & Bấm Start</span>
             </a>
+            <div style="font-size: 12px; color: #38bdf8; max-width: 440px; margin-top: 4px;">
+              ⚡ <strong>1-Click tự động:</strong> Bấm nút trên để Telegram tự mở và kết nối thẳng với MSSV của bạn (hoàn toàn không cần nhập SĐT).
+            </div>
           </div>
 
-          <div style="max-width: 360px; margin: 0 auto 24px; display: flex; gap: 8px;">
-            <input type="text" id="tgStudentChatId" class="input-control" placeholder="Hoặc nhập Chat ID Telegram..." style="font-size: 13px;">
+          <div style="max-width: 380px; margin: 0 auto 20px; display: flex; gap: 8px;">
+            <input type="text" id="tgStudentChatId" class="input-control" placeholder="Hoặc nhập @username / Chat ID..." style="font-size: 13px;">
             <button class="btn-secondary" style="padding: 0 16px; white-space: nowrap; font-size: 13px;" onclick="registerStudentChatId()">
               Kết nối
             </button>
@@ -1880,7 +1918,7 @@
           <span>🔒 Bảo mật & Quyền riêng tư</span>
         </button>
         <span>•</span>
-        <span>tool by <a href="https://github.com/tronghunh" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none; font-weight: 500;" onmouseover="this.style.color='#fff'; this.style.textDecoration='underline'" onmouseout="this.style.color='var(--text-muted)'; this.style.textDecoration='none'">@tronghunh</a></span>
+        <span>tool by <a href="https://instagram.com/tronghunh" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none; font-weight: 500;" onmouseover="this.style.color='#fff'; this.style.textDecoration='underline'" onmouseout="this.style.color='var(--text-muted)'; this.style.textDecoration='none'">@tronghunh</a></span>
       </div>
       <div style="display: flex; align-items: center; gap: 16px;">
         <span>UTECal</span>
@@ -2227,22 +2265,59 @@
 
     function toggleLoginMode(mode) {
       const tabPass = document.getElementById('tabLoginPass');
+      const tabGoogle = document.getElementById('tabLoginGoogle');
       const tabToken = document.getElementById('tabLoginToken');
       const formPass = document.getElementById('formLoginPass');
+      const formGoogle = document.getElementById('formLoginGoogle');
       const formToken = document.getElementById('formLoginToken');
       const errorDiv = document.getElementById('loginError');
       if (errorDiv) errorDiv.classList.add('hidden');
 
-      if (mode === 'pass') {
-        tabPass.classList.add('active');
-        tabToken.classList.remove('active');
-        formPass.classList.remove('hidden');
-        formToken.classList.add('hidden');
-      } else {
-        tabToken.classList.add('active');
-        tabPass.classList.remove('active');
-        formToken.classList.remove('hidden');
-        formPass.classList.add('hidden');
+      tabPass?.classList.toggle('active', mode === 'pass');
+      tabGoogle?.classList.toggle('active', mode === 'google');
+      tabToken?.classList.toggle('active', mode === 'token');
+
+      formPass?.classList.toggle('hidden', mode !== 'pass');
+      formGoogle?.classList.toggle('hidden', mode !== 'google');
+      formToken?.classList.toggle('hidden', mode !== 'token');
+    }
+
+    async function handleGoogleLoginCallback(response) {
+      const errorDiv = document.getElementById('loginError');
+      if (errorDiv) errorDiv.classList.add('hidden');
+
+      if (!response || !response.credential) {
+        if (errorDiv) {
+          errorDiv.textContent = 'Không nhận được mã xác thực từ Google.';
+          errorDiv.classList.remove('hidden');
+        }
+        return;
+      }
+
+      const tabBtn = document.getElementById('tabLoginGoogle');
+      if (tabBtn) tabBtn.textContent = 'Đang xác thực...';
+
+      try {
+        const res = await fetch('/api/login/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.message || 'Đăng nhập Google thất bại');
+        }
+        localStorage.setItem('hcmute_session_token', data.session_token);
+        appState.authenticated = true;
+        appState.profile = data.profile;
+        showDashboard();
+      } catch (err) {
+        if (errorDiv) {
+          errorDiv.textContent = err.message || 'Lỗi xác thực tài khoản Google với trường.';
+          errorDiv.classList.remove('hidden');
+        }
+      } finally {
+        if (tabBtn) tabBtn.textContent = 'Google UTE';
       }
     }
 
@@ -2413,6 +2488,34 @@
             appState.includePastExams ? `Hiện tất cả (${totalExams})` : `Chỉ hiện môn sắp thi (${upExams})`;
         }
 
+        // Smart Auto-Focus Week:
+        // Jump to the closest week with classes so timetable never opens to an empty screen
+        if (!appState.currentWeekMonday && appState.classes && appState.classes.length > 0) {
+          const now = new Date();
+          const thisMonday = getMonday(now);
+          const thisSunday = new Date(thisMonday);
+          thisSunday.setDate(thisMonday.getDate() + 6);
+          thisSunday.setHours(23, 59, 59, 999);
+
+          const hasClassesThisWeek = appState.classes.some(c => {
+            if (!c.start) return false;
+            const dt = new Date(c.start);
+            return dt >= thisMonday && dt <= thisSunday;
+          });
+
+          if (hasClassesThisWeek) {
+            appState.currentWeekMonday = thisMonday;
+          } else {
+            // Find first upcoming class >= today
+            const upcomingClass = appState.classes.find(c => c.start && new Date(c.start) >= now);
+            if (upcomingClass) {
+              appState.currentWeekMonday = getMonday(new Date(upcomingClass.start));
+            } else {
+              appState.currentWeekMonday = thisMonday;
+            }
+          }
+        }
+
         renderScheduleCalendar();
         renderExamsGrid(appState.exams);
       } catch (err) {
@@ -2435,6 +2538,23 @@
 
     function onSemesterChange() {
       loadOverviewData(true);
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDateYMD(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     function getCourseHexColor(title) {
@@ -2525,7 +2645,8 @@
       const dayStrip = document.getElementById('mobileDayStrip');
       if (dayStrip) {
         dayStrip.innerHTML = dayShorts.map((shortName, i) => {
-          const d = new Date(mon.getTime() + i * 86400000);
+          const d = new Date(mon);
+          d.setDate(mon.getDate() + i);
           const isToday = d.getTime() === now.getTime();
           const isActive = i === appState.selectedDayIndex;
           return `
@@ -2558,7 +2679,8 @@
       const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
       const dayDates = [];
       for (let i = 0; i < 7; i++) {
-        const d = new Date(mon.getTime() + i * 86400000);
+        const d = new Date(mon);
+        d.setDate(mon.getDate() + i);
         dayDates.push(d);
       }
 
@@ -2606,12 +2728,13 @@
         // 7 Day Cells for this session
         dayDates.forEach(d => {
           const isToday = d.getTime() === now.getTime();
-          const dayDateStr = d.toDateString();
+          const dayYMD = formatDateYMD(d);
 
-          // Find classes in this day & session
+          // Find classes in this day & session using YYYY-MM-DD
           const matchingClasses = (appState.classes || []).filter(c => {
+            if (!c.start) return false;
             const cStart = new Date(c.start);
-            if (cStart.toDateString() !== dayDateStr) return false;
+            if (formatDateYMD(cStart) !== dayYMD) return false;
             const hour = cStart.getHours() + (cStart.getMinutes() / 60);
             if (sess.id === 'morning') return hour < 12.0;
             if (sess.id === 'afternoon') return hour >= 12.0 && hour < 17.5;
@@ -2677,15 +2800,17 @@
       const daysToRender = isMobile ? [appState.selectedDayIndex] : [0, 1, 2, 3, 4, 5, 6];
 
       container.innerHTML = daysToRender.map(idx => {
-        const d = new Date(mon.getTime() + idx * 86400000);
+        const d = new Date(mon);
+        d.setDate(mon.getDate() + idx);
         const isToday = d.getTime() === now.getTime();
-        const dayDateStr = d.toDateString();
+        const dayYMD = formatDateYMD(d);
 
         let sessionHtml = '';
         sessions.forEach(sess => {
           const matchingClasses = (appState.classes || []).filter(c => {
+            if (!c.start) return false;
             const cStart = new Date(c.start);
-            if (cStart.toDateString() !== dayDateStr) return false;
+            if (formatDateYMD(cStart) !== dayYMD) return false;
             const hour = cStart.getHours() + (cStart.getMinutes() / 60);
             if (sess.id === 'morning') return hour < 12.0;
             if (sess.id === 'afternoon') return hour >= 12.0 && hour < 17.5;
@@ -2893,13 +3018,19 @@
 
     function renderExamsGrid(exams) {
       const grid = document.getElementById('examsGrid');
-      if (!exams || exams.length === 0) {
-        grid.innerHTML = `<div class="empty-state"><div class="empty-icon">📝</div>Chưa có môn thi kết thúc học phần sắp tới.</div>`;
+      if (!grid) return;
+
+      const now = new Date();
+      const filteredExams = appState.includePastExams
+        ? (exams || [])
+        : (exams || []).filter(e => new Date(e.start) >= now);
+
+      if (filteredExams.length === 0) {
+        grid.innerHTML = `<div class="empty-state"><div class="empty-icon">📝</div>${appState.includePastExams ? 'Chưa có dữ liệu lịch thi.' : 'Không có môn thi sắp tới trong đợt này.'}</div>`;
         return;
       }
 
-      const now = new Date();
-      grid.innerHTML = exams.map(e => {
+      grid.innerHTML = filteredExams.map(e => {
         const startDt = new Date(e.start);
         const isUpcoming = startDt >= now;
         const diffMs = startDt - now;
@@ -3330,7 +3461,7 @@
 
       // Check if user entered phone number
       if (chatId.startsWith('+') || /^0\d{8,11}$/.test(chatId)) {
-        showBanner('Telegram không thể gửi tin nhắn qua SĐT. Bạn chỉ cần bấm nút "Mở Telegram & Bấm Start" phía trên là kết nối thành công ngay nhé!', 'error');
+        showBanner('💡 Telegram không cho phép Bot tìm kiếm hay nhắn tin qua Số điện thoại nhằm bảo vệ quyền riêng tư. Bạn chỉ cần nhấn nút "Mở Telegram & Bấm Start" ở trên là kết nối tự động 100%!', 'error');
         return;
       }
 

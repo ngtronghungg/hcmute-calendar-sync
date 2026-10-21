@@ -99,8 +99,8 @@ Nếu bạn sử dụng macOS, Linux hoặc muốn chạy lệnh từng bước 
 
 **Bước 1: Tải mã nguồn về máy**
 ```bash
-git clone https://github.com/tronghunh/utecal.git
-cd utecal
+git clone https://github.com/ngtronghungg/hcmute-calendar-sync.git
+cd hcmute-calendar-sync
 ```
 
 **Bước 2: Tạo môi trường ảo và cài đặt thư viện**
@@ -152,7 +152,7 @@ Trình duyệt sẽ tự động mở trang chủ tại `http://127.0.0.1:5000`.
 ## 🛠️ Cấu Trúc Dự Án
 
 ```
-utecal/
+CalendarGetting/ (UTECal)
 ├── web/
 │   ├── index.html           # Giao diện chính người dùng (Dark mode, hỗ trợ PC & Mobile)
 │   └── admin.html           # Bảng điều khiển quản lý nội bộ
@@ -196,6 +196,6 @@ Mọi đóng góp, báo lỗi hoặc đề xuất cải tiến từ cộng đồ
 Dự án được phân phối dưới giấy phép mã nguồn mở **MIT License**. Tự do sử dụng, chỉnh sửa và chia sẻ vì mục đích hỗ trợ học tập cho cộng đồng sinh viên HCMUTE.
 
 <div align="center">
-  <p>Tool by <strong><a href="https://github.com/tronghunh">@tronghunh</a></strong></p>
+  <p>Tool by <strong><a href="https://instagram.com/tronghunh" target="_blank">@tronghunh</a></strong></p>
   <p>Dành tặng cộng đồng sinh viên <strong>HCMUTE</strong> 💙</p>
 </div>
